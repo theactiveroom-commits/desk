@@ -1,0 +1,1103 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090C12"><meta name="robots" content="noindex,nofollow"><style>html{color-scheme:dark}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style><script>window.QDSS_REMOTE = {"url": "data.bin"};</script></head><body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>QDSS Desk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a trading terminal built from LAYERS you can stack. Wide screens: top bar with the layer chips, then watchlist | big chart | signal
+   panel. Phones: the same parts stacked, chart first. One deliberate dark look (a chart desk at night); every colour is a token. */
+:root {
+  --bg: #090C12; --panel: #0F141D; --panel-2: #151B27; --raise: #1B2332; --line: #222C3D; --ink: #E7ECF5; --muted: #8A96AD; --faint: #5C6880;
+  --accent: #5B8CFF; --buy: #1FBF8F; --sell: #F0506E; --up: #3D8BFF; --down: #FF9A2E; --dial: #B48CFF; --warn: #FFB84D; --on-solid: #071018;
+  --gold: #F5C451;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif; --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; font-variant-numeric: tabular-nums }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg) }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0 }
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px }
+.muted { color: var(--muted) } .small { font-size: 12.5px } p { margin: 0 }
+h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin: 0 0 8px; font-weight: 600 }
+.pos { color: var(--buy) } .neg { color: var(--sell) }
+
+/* ── shell ── */
+.app { display: grid; grid-template-columns: 312px minmax(0, 1fr) 404px; grid-template-rows: auto minmax(0, 1fr); height: 100%; gap: 1px; background: var(--line) }
+.top { grid-column: 1 / -1; background: var(--panel); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px 18px; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.brand { display: flex; align-items: center; gap: 9px; font: 700 17px var(--display); letter-spacing: -0.01em }
+.brand svg { display: block }
+.layers { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; align-items: center }
+.layers::-webkit-scrollbar { display: none }
+.lay { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-weight: 600; font-size: 12.5px; color: var(--muted); letter-spacing: 0.02em }
+.lay .tick { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--faint); display: grid; place-items: center; font-size: 11px; line-height: 1; color: transparent }
+.lay[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 20%, var(--bg)); border-color: var(--accent); color: var(--ink) }
+.lay[aria-pressed="true"] .tick { background: var(--accent); border-color: var(--accent); color: var(--on-solid) }
+.lay.sysb { padding-left: 12px } .lay.sysb[aria-pressed="true"] { background: var(--accent); color: var(--on-solid) }
+.lay .n { font: 700 11px var(--display); padding: 1px 6px; border-radius: 999px; background: var(--raise); color: var(--muted) }
+.lay .n.A { background: color-mix(in srgb, var(--gold) 26%, transparent); color: var(--gold) } .lay .n.B { background: color-mix(in srgb, var(--buy) 22%, transparent); color: var(--buy) }
+.lay .dotp { width: 8px; height: 8px; border-radius: 50%; background: var(--buy) } .lay .dotp.s { background: var(--sell) } .lay .dotp.up { background: var(--up) } .lay .dotp.dn { background: var(--down) }
+.sep { flex: 0 0 1px; align-self: stretch; background: var(--line); margin: 4px 4px }
+.status { color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 7px; white-space: nowrap; justify-self: end }
+.status.stale { color: var(--warn) }
+.livedot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); display: inline-block }
+.livedot.on { background: var(--buy); box-shadow: 0 0 0 4px color-mix(in srgb, var(--buy) 22%, transparent) }
+.symbol { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px; min-width: 0; flex-wrap: wrap }
+.symbol .name { font: 700 26px var(--display); letter-spacing: -0.02em }
+.symbol .sub { color: var(--muted); font-size: 13px }
+.symbol .live { font: 600 26px var(--display) }
+.symbol .chg { font-weight: 600; font-size: 13px }
+
+/* ── watchlist ── */
+.watch { background: var(--panel); overflow-y: auto; padding: 12px 10px 16px; min-height: 0 }
+.whead, .wrow { display: grid; grid-template-columns: 50px minmax(56px, 1fr) auto; align-items: center; gap: 8px }
+.whead { padding: 0 6px 6px; color: var(--faint); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase }
+.whead .tfl, .wsq { display: grid; grid-auto-flow: column; grid-auto-columns: 21px; gap: 3px; justify-content: end }
+.whead .tfl span { text-align: center; letter-spacing: 0; font-size: 9.5px }
+.wrow { padding: 5px 6px; border-radius: 9px }
+.wrow[data-on="true"] { background: var(--raise); box-shadow: inset 2px 0 0 var(--accent) }
+.wmain { display: contents; text-align: left }
+.wmain .sym { font: 700 14px var(--display) } .wmain .px { color: var(--muted); font-size: 12.5px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.sq { width: 21px; height: 21px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--faint) }
+.sq[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px }
+.sq.none { background: transparent; border-style: dashed; opacity: 0.5 } .sq.gap { visibility: hidden }
+.sq.long { background: var(--buy); border-color: var(--buy); color: var(--on-solid) } .sq.short { background: var(--sell); border-color: var(--sell); color: var(--on-solid) }
+.sq.called-long { border: 2px solid var(--buy); color: var(--buy) } .sq.called-short { border: 2px solid var(--sell); color: var(--sell) }
+.sq.b2 { border-color: var(--buy); color: var(--buy) } .sq.s2 { border-color: var(--sell); color: var(--sell) }
+.sq.gA { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--panel-2)) } .sq.gB { border-color: var(--buy); color: var(--buy) }
+.wkey { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 12px 6px 0; color: var(--muted); font-size: 11.5px; border-top: 1px solid var(--line); margin-top: 12px }
+.wkey span { display: inline-flex; align-items: center; gap: 5px } .wkey .sq { width: 14px; height: 14px; border-radius: 4px; font-size: 0 }
+
+/* ── stage: toolbar, chart ── */
+.stage { background: var(--bg); display: flex; flex-direction: column; min-width: 0; min-height: 0 }
+.toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap }
+.tfb { padding: 6px 11px; border-radius: 7px; font-weight: 600; font-size: 13px; color: var(--muted) }
+.tfb[aria-pressed="true"] { background: var(--raise); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent) }
+.tool { margin-left: auto; padding: 6px 11px; border-radius: 7px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600 }
+.pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: 11.5px; white-space: nowrap; color: var(--on-solid) }
+.pill.buy { background: var(--buy) } .pill.sell { background: var(--sell) } .pill.up { background: var(--up) } .pill.down { background: var(--down) } .pill.idle { background: var(--faint); color: var(--ink) }
+.pill.A { background: var(--gold) } .pill.B { background: var(--buy) }
+.pill.line { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 600 }
+.chartbox { position: relative; flex: 1; min-height: 0 }
+#lw { position: absolute; inset: 0 }
+#lw.in { animation: fade .35s ease both }
+.ohlc { position: absolute; left: 12px; top: 8px; z-index: 3; font-size: 12px; color: var(--muted); pointer-events: none; display: flex; gap: 10px; flex-wrap: wrap; max-width: calc(100% - 90px) }
+.ohlc b { color: var(--ink); font-weight: 600 }
+.pmask { position: absolute; right: 0; bottom: 26px; width: 60px; z-index: 2; background: var(--bg); border-left: 1px solid var(--line); pointer-events: none }
+.psep { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); z-index: 2; pointer-events: none }
+.plabel { position: absolute; left: 12px; z-index: 3; font-size: 11px; color: var(--muted); pointer-events: none; background: color-mix(in srgb, var(--bg) 78%, transparent); padding: 1px 6px; border-radius: 5px; max-width: calc(100% - 90px) }
+.plabel b { color: var(--ink); font-weight: 600 }
+.nochart { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); padding: 24px; text-align: center }
+.keyline { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 7px 12px; color: var(--muted); font-size: 11.5px; background: var(--panel); border-top: 1px solid var(--line) }
+.keyline span { display: inline-flex; align-items: center; gap: 5px }
+.sw { display: inline-block; width: 18px; height: 8px; border-radius: 3px }
+
+/* ── right panel ── */
+.panel { background: var(--panel); display: flex; flex-direction: column; min-height: 0; min-width: 0 }
+.ptabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none }
+.ptabs::-webkit-scrollbar { display: none }
+.ptabs button { padding: 8px 9px 10px; font-weight: 600; font-size: 12.5px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap }
+.ptabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent) }
+.ptabs .badge { background: var(--sell); color: #fff; border-radius: 999px; font-size: 10px; padding: 1px 6px; margin-left: 5px }
+.pbody { padding: 14px; overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px }
+.pbody > * { animation: rise .4s cubic-bezier(.2, .7, .2, 1) both }
+.pbody > *:nth-child(2) { animation-delay: .05s } .pbody > *:nth-child(3) { animation-delay: .1s } .pbody > *:nth-child(4) { animation-delay: .15s } .pbody > *:nth-child(n+5) { animation-delay: .2s }
+.card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0 }
+.why { font-size: 15px; line-height: 1.5 }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px 12px }
+.kv div { min-width: 0 } .kv b { display: block; font: 600 15px var(--display) } .kv span { font-size: 11.5px; color: var(--muted) }
+.rowline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap }
+.setup { display: flex; flex-direction: column; gap: 8px }
+details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 12.5px }
+details p { margin-top: 6px; font-size: 12.5px; color: var(--muted) }
+.how summary { font-size: 13px }
+.how ol { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 7px; font-size: 13px; color: var(--muted) }
+.how ol b { color: var(--ink); font-weight: 600 }
+
+/* the signal card: one word tells you what the selected layers say right now */
+.sig { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; border-radius: 14px; padding: 14px; border: 1px solid var(--line); background: linear-gradient(140deg, var(--raise), var(--panel-2)) }
+.sig.buy { border-color: color-mix(in srgb, var(--buy) 55%, var(--line)); background: linear-gradient(140deg, color-mix(in srgb, var(--buy) 20%, var(--panel-2)), var(--panel-2)) }
+.sig.sell { border-color: color-mix(in srgb, var(--sell) 55%, var(--line)); background: linear-gradient(140deg, color-mix(in srgb, var(--sell) 20%, var(--panel-2)), var(--panel-2)) }
+.sig.live { animation: glow 1.8s ease-in-out infinite }
+.ring { position: relative; width: 92px; height: 92px }
+.ring svg { transform: rotate(-90deg); display: block }
+.ring circle { fill: none; stroke-width: 9 } .ring .tr { stroke: var(--line) } .ring .fg { stroke: var(--buy); stroke-linecap: round; transition: stroke-dashoffset 1.1s cubic-bezier(.2, .7, .2, 1) }
+.ring.A .fg { stroke: var(--gold) } .ring.low .fg { stroke: var(--warn) } .ring.off .fg { stroke: var(--faint) }
+.ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font: 700 24px/1 var(--display) }
+.ring .num small { display: block; font: 500 9.5px var(--body); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 3px }
+.sig .word { font: 700 30px/1.05 var(--display); letter-spacing: -0.02em }
+.sig.buy .word { color: var(--buy) } .sig.sell .word { color: var(--sell) }
+.sig .sub { color: var(--muted); font-size: 13px; margin-top: 6px }
+.sig .verdict { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted) }
+
+/* the members of a stack, and the other stacks you could pick */
+.mem { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line) }
+.mem:first-of-type { border-top: 0 }
+.mem .nm { font-weight: 600 } .mem .st { font-size: 12px; color: var(--muted) }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); width: 100%; text-align: left }
+.srow:first-of-type { border-top: 0 }
+.srow .nm { font-weight: 600; font-size: 13px } .srow .wr { font: 600 13px var(--display); color: var(--muted); min-width: 40px; text-align: right }
+.srow[aria-current="true"] .nm { color: var(--accent) }
+
+/* trade plans: the three risk levels, the exact prices, the profit picture */
+.tiers { display: inline-flex; gap: 2px; margin-left: 10px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg) }
+.tierb { padding: 5px 10px; border-radius: 7px; font-weight: 700; font-size: 12px; color: var(--muted); letter-spacing: 0.03em }
+.tierb[aria-pressed="true"] { background: var(--accent); color: var(--on-solid) }
+.px3 { display: grid; gap: 8px; margin-bottom: 10px }
+.pxr { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 9px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line) }
+.pxr .k { font: 700 11px var(--body); letter-spacing: 0.08em; color: var(--muted) } .pxr .v { font: 700 20px var(--display) } .pxr .d { font-weight: 600; font-size: 13px }
+.pxr.b { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)) } .pxr.t { border-color: color-mix(in srgb, var(--buy) 55%, var(--line)) } .pxr.s { border-color: color-mix(in srgb, var(--sell) 55%, var(--line)) }
+.pxr.t .k, .pxr.t .d { color: var(--buy) } .pxr.s .k, .pxr.s .d { color: var(--sell) } .pxr .v.txt { font: 500 13px var(--body); color: var(--muted) }
+.grow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; text-align: center; margin-bottom: 8px }
+.grow b { display: block; font: 700 22px var(--display) } .grow span { font-size: 11.5px; color: var(--muted) } .grow .vs { color: var(--faint); font-size: 12px }
+.spark { width: 100%; height: 74px; display: block; margin: 6px 0 4px } .spark path { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke } .spark .p { stroke: var(--gold) } .spark .h { stroke: var(--faint); stroke-dasharray: 4 3 }
+.lvh, .lvl { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; width: 100%; text-align: right }
+.lvh { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 10px 4px }
+.lvl { padding: 10px; border-radius: 10px; border: 1px solid var(--line); margin-top: 6px; font: 600 14px var(--display) }
+.lvl .nm { text-align: left; font: 700 13px var(--body); display: inline-flex; align-items: center; gap: 6px }
+.lvl[aria-current="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent) }
+.okdot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); display: inline-block }
+table.st { width: 100%; border-collapse: collapse; font-size: 12.5px } table.st th { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; text-align: right; padding: 4px 6px; font-weight: 600 }
+table.st td { padding: 7px 6px; border-top: 1px solid var(--line); text-align: right; font-family: var(--display); font-weight: 600 } table.st td:first-child, table.st th:first-child { text-align: left; font-family: var(--body) }
+
+.bt { width: 100%; border-collapse: collapse; font-size: 13px }
+.bt td { padding: 6px 8px; border-top: 1px solid var(--line) } .bt tr:first-child td { border-top: 0 }
+.bt td:first-child { color: var(--muted) } .bt td:last-child { text-align: right; font-weight: 600; font-family: var(--display) }
+.bt tr.here td { background: color-mix(in srgb, var(--accent) 16%, transparent) }
+.lightset { display: flex; flex-wrap: wrap; gap: 6px }
+.light { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 6px; font-size: 12px; color: var(--faint) }
+.light i { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--faint); display: inline-block }
+.light.on { color: var(--ink); font-weight: 600 } .light.on.b i { background: var(--buy); border-color: var(--buy) } .light.on.s i { background: var(--sell); border-color: var(--sell) }
+.list { display: flex; flex-direction: column }
+.item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); text-align: left; width: 100% }
+.item:first-child { border-top: 0; padding-top: 0 } .item:last-child { padding-bottom: 0 }
+.item .body { min-width: 0; flex: 1 } .item .ttl { font-weight: 600 } .item .txt { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere }
+.item .time { font-size: 11.5px; color: var(--faint); white-space: nowrap }
+.sys { font: 700 10px var(--body); letter-spacing: 0.06em; border-radius: 5px; padding: 2px 6px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); white-space: nowrap }
+.sys.q { color: var(--muted); border-color: var(--line) } .sys.st { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)) }
+.chips { display: flex; gap: 6px; flex-wrap: wrap }
+.chip { font-weight: 600; font-size: 12.5px; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 5px 12px }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.grid-scroll { overflow-x: auto }
+table.grid { border-collapse: separate; border-spacing: 4px; width: 100% }
+table.grid th { font-size: 11px; font-weight: 600; color: var(--faint); text-align: center; padding: 2px }
+table.grid th.rowhead { text-align: left; font: 700 13px var(--display); color: var(--ink); padding-right: 6px }
+table.grid td { padding: 0 } table.grid .sq { width: 100%; min-width: 34px; height: 34px; border-radius: 8px; font-size: 12px }
+dl { margin: 0; display: grid; gap: 12px } dt { font-weight: 700 } dd { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 65ch }
+.note { border: 1px solid color-mix(in srgb, var(--warn) 60%, var(--line)); color: var(--warn); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; font-weight: 500 }
+.foot { color: var(--faint); font-size: 11.5px }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; max-width: min(92vw, 520px); background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 16px; font-weight: 600; box-shadow: 0 10px 36px rgba(0, 0, 0, .5); animation: rise .35s ease both }
+.toast small { display: block; font-weight: 400; opacity: .8 }
+.gate { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; padding: 24px; text-align: center }
+.gate[hidden] { display: none }
+.gate div { max-width: 420px; display: grid; gap: 10px } .gate b { font: 700 20px var(--display) }
+@keyframes rise { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 transparent } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent) } }
+@keyframes beat { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.6); opacity: .5 } }
+.lay .dotp.fresh { animation: beat 1.4s ease-in-out infinite }
+
+/* ── phones and narrow windows: the same parts stacked, chart first ── */
+@media (max-width: 1023px) {
+  html, body { height: auto }
+  .app { display: block; height: auto; background: var(--bg) }
+  .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, 1fr) auto }
+  .layers { grid-column: 1 / -1; grid-row: 2; margin-inline: -2px }
+  .symbol .name, .symbol .live { font-size: 22px }
+  .watch { display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); scrollbar-width: none }
+  .watch::-webkit-scrollbar { display: none }
+  .whead, .wsq, .wkey { display: none }
+  .wrow { display: block; padding: 0; flex: 0 0 auto; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2) }
+  .wrow[data-on="true"] { background: var(--raise); border-color: var(--accent); box-shadow: none }
+  .wmain { display: flex; gap: 8px; align-items: baseline; padding: 7px 12px }
+  .toolbar, .keyline { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  .chartbox { flex: none; height: 66vh; min-height: 380px; max-height: 680px }
+  .panel { display: block; border-top: 1px solid var(--line) }
+  .ptabs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--topH, 130px)); z-index: 10; background: var(--panel); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)) }
+  .pbody { overflow: visible; padding-block: 14px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
+</style>
+
+<div class="app" id="app">
+  <header class="top" id="top">
+    <div class="brand"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="6" fill="#5B8CFF"/><path d="M5 14l4-4 3 3 5-6" stroke="#071018" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>QDSS Desk</div>
+    <div class="layers" role="group" aria-label="Layers" id="layers"></div>
+    <div class="status" id="status"></div>
+    <div class="symbol" id="symbol"></div>
+  </header>
+  <aside class="watch" id="watch" aria-label="Watchlist"></aside>
+  <section class="stage">
+    <div class="toolbar" id="toolbar"></div>
+    <div class="chartbox"><div class="ohlc" id="ohlc"></div><div id="panes"></div><div id="lw"></div></div>
+    <div class="keyline" id="keyline"></div>
+  </section>
+  <aside class="panel">
+    <nav class="ptabs" role="tablist" aria-label="Details" id="ptabs"></nav>
+    <div class="pbody" id="pbody"></div>
+  </aside>
+</div>
+<div class="gate" id="gate" hidden><div><b id="gatehead">Opening your desk</b><p class="muted" id="gatetext">Loading the latest data.</p></div></div>
+
+<script type="application/json" id="qdss-data">null</script>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function () {
+  var D = JSON.parse(document.getElementById('qdss-data').textContent);
+  var LOCAL = window.QDSS_LOCAL || null, REMOTE = window.QDSS_REMOTE || null, LW = window.LightweightCharts || null;
+  var CAN_FETCH = !!(LOCAL || REMOTE);              // a copy inside Claude cannot fetch anything: it stays a snapshot
+  var TZ = -new Date().getTimezoneOffset() * 60;
+  var TFS = ['15m', '1h', '4h', '8h', '12h', '1d'], TFL = { '15m': '15m', '1h': '1h', '4h': '4h', '8h': '8h', '12h': '12h', '1d': '1D' };
+  var TFN = { '15m': '15-minute', '1h': '1-hour', '4h': '4-hour', '8h': '8-hour', '12h': '12-hour', '1d': 'Daily' };
+  var SECS = { '15m': 900, '1h': 3600, '4h': 14400, '8h': 28800, '12h': 43200, '1d': 86400 };
+  var OVER = ['atr', 'mr', 'opt', 'trend', 'conf', 'htf'];          // layers you can stack (in this order everywhere)
+  var EVENT = { atr: 1, mr: 1, conf: 1 };
+  var LNAME = { plan: 'TRADE PLANS', atr: 'ATR', mr: 'MEAN REV', opt: 'OPT TREND', trend: 'TREND', conf: 'CONFLUENCE', htf: 'BIG TREND', all: 'ALL THREE', perps: 'PERPS' };
+  var FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.764, 1];
+  var S = { sys: 'plan', book: 'short', tier: 'growth', sel: ['atr'], name: 'BTC', tf: '8h', ptab: 'decision', af: 'all', how: true };
+  try { var sv = JSON.parse(localStorage.getItem('qdss-desk7') || '{}'); for (var k0 in sv) if (k0 in S) S[k0] = sv[k0]; } catch (e) {}
+  function save() { try { localStorage.setItem('qdss-desk7', JSON.stringify(S)); } catch (e) {} }
+  var BOOKS = ['spot', 'long', 'short'], BNAME = { spot: 'SPOT', long: 'PERP LONG', short: 'PERP SHORT' }, BSHORT = { spot: 'SPOT', long: 'LONG', short: 'SHORT' };
+  var BSAY = { spot: 'buy and sell the coin itself, no leverage (0.40% fee each way)', long: 'a perpetual-futures long: low fees, funding, leverage possible', short: 'a perpetual-futures short: profits when the price falls' };
+  var TIERS = ['safe', 'balanced', 'growth'], TNAME = { safe: 'WINS 90%+', balanced: 'WINS 80%+', growth: 'PROFIT FIRST' }, TOLD = { safe: 'SAFE', balanced: 'BALANCED', growth: 'GROWTH' };
+  var TSAY = { safe: 'wins 90%+ of trades: small wins, a rare bigger loss', balanced: 'wins 80%+ of trades', growth: 'built for profit: fewer wins, bigger wins' };
+  var WHY = { target: 'target hit', stop: 'stop hit', trail: 'trailing stop hit', half: 'half was taken at target 1, the rest closed at break-even', signal: 'the plan\'s sell signal' };
+  var px = {}, feedOn = false, unread = 0, lw = null;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(x) { return x == null ? '-' : x >= 1000 ? Math.round(x).toLocaleString('en-US') : x >= 1 ? x.toFixed(2) : x >= 0.01 ? x.toFixed(4) : x.toPrecision(3); }
+  function when(t, time) { return new Date(t * 1000).toLocaleString('en-US', time === false ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+  function pct(x) { return (x > 0 ? '+' : '') + x.toFixed(2) + '%'; }
+  function cssv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function rgba(hex, a) { var h = hex.replace('#', ''); return 'rgba(' + parseInt(h.slice(0, 2), 16) + ',' + parseInt(h.slice(2, 4), 16) + ',' + parseInt(h.slice(4, 6), 16) + ',' + a + ')'; }
+  function norm() { if (!D) return; D.L = D.L || {}; D.H = D.H || {}; D.C = D.C || {}; D.P = D.P || {}; if (D.atr && !D.L.atr) D.L.atr = D.atr; }     // the web copy starts with no data until it is unlocked
+  norm();
+  function LD(sys) { return sys === 'perps' ? (D.perps || {}) : sys === 'all' ? (D.qdss || {}) : sys === 'plan' ? D.P : (D.L.atr || {}); }
+  function planAt(k, tier, book) { var p = D.P[k || key()]; p = p && p[book || S.book]; return p ? p[tier || S.tier] : null; }
+  function pct0(x) { return (x > 0 ? '+' : '') + Math.round(x) + '%'; }
+  function dollars(x) { return '$' + Math.round(x).toLocaleString('en-US'); }
+  function names(sys) { var out = []; Object.keys(LD(sys)).forEach(function (k) { var n = k.split('|')[0]; if (out.indexOf(n) < 0) out.push(n); }); return out; }
+  function tfsOf(sys, name) { return TFS.filter(function (tf) { return LD(sys)[name + '|' + tf]; }); }
+  function key() { return S.name + '|' + S.tf; }
+  function bars(k) { var q = (D.qdss || {})[k] || (D.perps || {})[k]; return q ? q.bars : []; }
+  function have(sys) { return Object.keys(LD(sys)).length > 0; }
+  function htfOk(k) { return !!D.H[k || key()]; }
+  function sel() { return OVER.filter(function (x) { return S.sel.indexOf(x) >= 0 && (x !== 'htf' || htfOk()); }); }
+  function stackKey() { return sel().join('+'); }
+  function fix() {
+    if (!have(S.sys)) S.sys = have('plan') ? 'plan' : have('stack') ? 'stack' : have('all') ? 'all' : 'perps';
+    if (TIERS.indexOf(S.tier) < 0) S.tier = 'growth';
+    if (BOOKS.indexOf(S.book) < 0) S.book = 'spot';
+    if (!Array.isArray(S.sel) || !S.sel.length) S.sel = ['atr'];
+    var ns = names(S.sys);
+    if (ns.indexOf(S.name) < 0) S.name = ns[0];
+    var tfs = tfsOf(S.sys, S.name);
+    if (tfs.indexOf(S.tf) < 0) S.tf = tfs.indexOf('1d') >= 0 ? '1d' : tfs[tfs.length - 1];
+    if (!sel().length) S.sel = ['atr'];
+  }
+  function pick(sys, name, tf) { if (sys) S.sys = sys; if (name) S.name = name; if (tf) S.tf = tf; fix(); renderAll(); }
+  function layerAt(l, k) { return (D.L[l] || {})[k || key()]; }
+  function gradeOf(c) { return c && c.ab ? c.ab : null; }
+  function winOf(c) { var p = c && c.pick; return p && p.whole && p.whole.win != null ? Math.round(p.whole.win) : null; }
+
+  // ── a stack, worked out the same way as the tests (combos.py): every signal layer must have given a buy within W bars (and no sell
+  //    since) and every trend layer must be blue; it sells on the first sell flag from any signal layer ──
+  function arraysOf(l, k, n) {
+    if (l === 'htf') { var h = D.H[k]; return h ? { st: h.dirs } : null; }
+    var d = layerAt(l, k); if (!d) return null;
+    if (l === 'opt') return d.ov && d.ov.rib ? { st: d.ov.rib.map(function (r) { return r[2]; }) } : null;
+    if (l === 'trend') return d.ov && d.ov.line ? { st: d.ov.line.map(function (r) { return r[1]; }) } : null;
+    var b = new Array(n).fill(false), s = new Array(n).fill(false);
+    d.buys.forEach(function (i) { if (i < n) b[i] = true; }); d.sells.forEach(function (i) { if (i < n) s[i] = true; });
+    return { b: b, s: s };
+  }
+  function combine(layers, k, w) {
+    var n = bars(k).length, ev = [], st = [], i, j;
+    for (i = 0; i < layers.length; i++) { var a = arraysOf(layers[i], k, n); if (!a) return null; if (a.st) st.push(a.st); else ev.push(a); }
+    var lb = ev.map(function () { return -1e9; }), ls = ev.map(function () { return -1e9; }), buys = [], sells = [], prev = false;
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < ev.length; j++) { if (ev[j].b[i]) lb[j] = i; if (ev[j].s[i]) ls[j] = i; }
+      var ok = true;
+      for (j = 0; j < ev.length; j++) if (!(i - lb[j] <= w && lb[j] > ls[j])) ok = false;
+      for (j = 0; j < st.length; j++) if (st[j][i] !== 1) ok = false;
+      if (ok && !prev) buys.push(i);
+      prev = ok;
+      if (ev.length) { for (j = 0; j < ev.length; j++) if (ev[j].s[i]) { sells.push(i); break; } }
+      else if (i > 0) { for (j = 0; j < st.length; j++) if (st[j][i] === -1 && st[j][i - 1] === 1) { sells.push(i); break; } }
+    }
+    return { buys: buys, sells: sells, n: n };
+  }
+  function leanOf(l, k) {                             // [word, css, detail] for one member of a stack
+    var n = bars(k).length;
+    if (l === 'htf') { var h = D.H[k]; if (!h) return ['n/a', 'line', '']; var u = h.dirs[h.dirs.length - 1] === 1; return [u ? 'BLUE' : 'ORANGE', u ? 'up' : 'down', h.big + ' ribbon']; }
+    var d = layerAt(l, k); if (!d) return ['n/a', 'line', ''];
+    if (l === 'opt' || l === 'trend') { var a = arraysOf(l, k, n); var up = a && a.st[a.st.length - 1] === 1; return [up ? 'BLUE' : 'ORANGE', up ? 'up' : 'down', up ? 'stay in' : 'stay out']; }
+    if (!d.last) return ['none', 'line', 'no flag yet'];
+    var ago = Math.max(0, Math.round((d.t - d.last[1]) / SECS[d.tf]));
+    return [d.last[0], d.last[0] === 'BUY' ? 'buy' : 'sell', ago === 0 ? 'on the last bar' : ago + ' bar' + (ago === 1 ? '' : 's') + ' ago'];
+  }
+
+  // ── small pieces ─────────────────────────────────────────────────────────
+  function perpSq(c) {
+    if (!c) return ['gap', '', ''];
+    if (c.state === 'open') return [c.side === 'long' ? 'long' : 'short', c.side === 'long' ? 'L' : 'S', c.side + ' trade open'];
+    if (c.state === 'called') return ['called-' + c.side, c.side === 'long' ? 'L' : 'S', c.side + ' just called'];
+    return c.state === 'waiting' ? ['', '', 'waiting for a signal'] : ['none', '', 'no set-up passes'];
+  }
+  function qdssSq(c) {
+    if (!c) return ['gap', '', ''];
+    if (c.buy === 3) return ['long', '3', 'ALL BUY: 3 buy lights'];
+    if (c.sell === 3) return ['short', '3', 'ALL SELL: 3 sell lights'];
+    if (c.buy === 2) return ['b2', '2', 'get ready to buy: 2 of 3 lights'];
+    if (c.sell === 2) return ['s2', '2', 'get ready to sell: 2 of 3 lights'];
+    return ['', '', 'nothing close'];
+  }
+  function stackSq(k) {                              // what a chart's square shows for the selected layers
+    var ls = sel(), c;
+    if (ls.length === 1 && ls[0] !== 'htf') {
+      c = layerAt(ls[0], k); if (!c) return ['gap', '', ''];
+      var g = gradeOf(c), w = winOf(c);
+      if (c.fresh && g) return [c.fresh === 'BUY' ? 'long' : 'short', c.fresh === 'BUY' ? 'B' : 'S', c.fresh + ' flag on the last bar, grade ' + g];
+      if (!g) return ['none', '', 'below 80%: no alerts'];
+      return ['g' + g, w >= 100 ? '99' : String(w), 'grade ' + g + ', win ratio ' + w + '%'];
+    }
+    var r = (D.C[k] || {})[ls.join('+')];
+    if (!r) return ['none', '', 'this stack is not tested here'];
+    if (!r.g) return ['none', '', 'below 80%: no alerts'];
+    var wr = Math.round(r.win);
+    return ['g' + r.g, wr >= 100 ? '99' : String(wr), 'grade ' + r.g + ', win ratio ' + wr + '%'];
+  }
+  function planSq(k) {
+    var p = planAt(k);
+    if (!p) return ['none', '', 'no plan clears the ' + TNAME[S.tier] + ' level here'];
+    if (!p.ok) return ['none', '', 'the plan was not confirmed on the newest prices: no alerts'];
+    if (p.fresh === 'IN') return p.side === 'short' ? ['short', 'S', 'SELL SHORT now'] : ['long', 'B', 'BUY now'];
+    if (p.fresh === 'OUT') return p.side === 'short' ? ['long', 'C', 'COVER (buy back) now'] : ['short', 'X', 'SELL now'];
+    if (p.open) return ['b2', '\u25CF', 'in a trade, ' + pct(p.open.pct) + ' so far'];
+    return ['gA', String(Math.min(99, Math.round(p.win))), 'confirmed plan, waiting for a buy. Wins ' + Math.round(p.win) + '% of trades'];
+  }
+  function sqBtn(sys, name, tf, on) {
+    var k = name + '|' + tf, c = LD(sys)[k];
+    if (!c) return '<span class="sq gap"></span>';
+    var q = sys === 'perps' ? perpSq(c) : sys === 'all' ? qdssSq(c) : sys === 'plan' ? planSq(k) : stackSq(k);
+    if (q[0] === 'gap') return '<span class="sq gap"></span>';
+    return '<button class="sq ' + q[0] + '" data-pick="' + esc(sys + '|' + name + '|' + tf) + '" aria-pressed="' + on + '" title="' + esc(name + ' ' + TFL[tf] + ': ' + q[2]) + '" aria-label="' + esc(name + ' ' + TFL[tf] + ': ' + q[2]) + '">' + q[1] + '</button>';
+  }
+  var ALABELS = ['PLAN', 'SAFE', 'BALANCED', 'GROWTH', 'STACK', 'MEAN REV', 'OPT TREND', 'TOGETHER', 'CONFLUENCE', 'TREND', 'ATR', 'PERP'];
+  function alabel(a) { for (var i = 0; i < ALABELS.length; i++) if (a.title.indexOf(ALABELS[i]) === 0) return ALABELS[i]; return 'QDSS'; }
+  function alertItem(a) {
+    var lab = alabel(a);
+    return '<div class="item"><span class="sys' + (lab === 'QDSS' ? ' q' : lab === 'STACK' || (lab === 'PLAN' || TOLD[lab.toLowerCase()]) ? ' st' : '') + '">' + lab + '</span><div class="body"><div class="ttl">' + esc(a.title.replace(/^QDSS /, '')) + '</div><div class="txt">' + esc(a.body) + '</div></div><span class="time">' + esc(when(a.t)) + '</span></div>';
+  }
+  function setupCard(x) {
+    var up = x.side === 'long' ? '+' : '-', dn = x.side === 'long' ? '-' : '+', cls = x.side === 'long' ? 'buy' : 'sell';
+    var now = x.state === 'open' ? '<span class="pill ' + cls + '">OPEN ' + pct(x.openPct) + '</span>' : x.state === 'called' ? '<span class="pill ' + cls + '">CALLED</span>' : '<span class="pill line">waiting</span>';
+    var s = '<div class="card setup"><div class="rowline"><span class="pill ' + cls + '">' + x.lev + 'x ' + x.side.toUpperCase() + '</span>' + (x.shortList ? '<span class="pill line">SHORT LIST</span>' : '') + (x.retired ? '<span class="pill line">RETIRED</span>' : '') + '<span style="flex:1"></span>' + now + '</div>';
+    s += '<div class="kv"><div><b>' + (x.tp != null ? up + x.tp + '%' : 'signal') + '</b><span>target (win)</span></div><div><b>' + dn + x.stop + '%</b><span>stop (loss)</span></div><div><b>' + (x.win != null ? Math.round(x.win) + '% of ' + x.trades : '-') + '</b><span>tested wins</span></div><div><b>' + (x.chance != null ? Math.round(x.chance) + '%' : '-') + '</b><span>chance alone</span></div></div>';
+    s += '<details><summary>Why this set-up, and its record</summary><p><b>Fires on:</b> ' + esc(x.model || '') + ' (' + esc(x.text || '') + '). <b>Ends by:</b> ' + esc(x.exit || '') + ', or the stop.</p>';
+    s += '<p><b>Evidence:</b> ' + esc(x.tier || '') + ', ' + (x.proven ? 'proven' : 'not proven') + (x.newTrades != null ? '. On the newest prices it won ' + x.newWins + ' of ' + x.newTrades + ' trades' : '') + '. Random entries with the same target and stop would win about ' + (x.chance != null ? Math.round(x.chance) : '?') + '%.</p>';
+    s += '<p><b>Last fired:</b> ' + (x.lastFired ? esc(when(x.lastFired)) : 'not in the loaded history') + '. <b>Live record:</b> ' + x.wins + ' wins, ' + x.losses + ' losses.</p></details></div>';
+    return s;
+  }
+  function lightRow(side, d) {
+    var n3 = ['Mean Reversion dot', 'Confluence flag', side === 'b' ? 'Trend up' : 'Trend down'];
+    return '<div class="lightset">' + n3.map(function (nm, i) { return '<span class="light ' + (d[i] ? 'on ' + side : '') + '"><i></i>' + nm + '</span>'; }).join('') + '</div>';
+  }
+  function ring(p, cls) {
+    var R = 40, C = 2 * Math.PI * R, v = p == null ? 0 : Math.max(0, Math.min(100, p));
+    return '<div class="ring ' + cls + '"><svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true"><circle class="tr" cx="46" cy="46" r="' + R + '"/><circle class="fg" cx="46" cy="46" r="' + R + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '" data-to="' + (C * (1 - v / 100)).toFixed(1) + '"/></svg><div class="num"><span><span data-count="' + (p == null ? '' : Math.round(v)) + '">' + (p == null ? '-' : '0') + '</span>' + (p == null ? '' : '%') + '<small>win ratio</small></span></div></div>';
+  }
+  function gradePill(g) { return g === 'A' ? '<span class="pill A">GRADE A</span>' : g === 'B' ? '<span class="pill B">GRADE B</span>' : '<span class="pill idle">NO GRADE: a check is under 80%</span>'; }
+
+  // ── the signal card ──────────────────────────────────────────────────────
+  function spark(eq) {
+    var W = 300, H = 70, mn = Infinity, mx = -Infinity;
+    eq.forEach(function (e) { mn = Math.min(mn, e[0], e[1]); mx = Math.max(mx, e[0], e[1]); });
+    function path(j) { return eq.map(function (e, i) { return (i ? 'L' : 'M') + (i / Math.max(1, eq.length - 1) * W).toFixed(1) + ' ' + (H - 2 - (e[j] - mn) / (mx - mn || 1) * (H - 4)).toFixed(1); }).join(''); }
+    return '<svg class="spark" viewBox="0 0 300 70" preserveAspectRatio="none" role="img" aria-label="The plan\'s account against just holding, on the newest prices"><path class="h" d="' + path(1) + '"/><path class="p" d="' + path(0) + '"/></svg>';
+  }
+  function planSig(p) {
+    if (!p) return '<div class="sig idle">' + ring(null, 'off') + '<div><div class="word">NO PLAN</div><div class="sub">Nothing reached the ' + TNAME[S.tier] + ' level on this chart\'s older prices. Try another level or timeframe.</div></div></div>';
+    var sh = p.side === 'short', IN = p.fresh === 'IN', OUT = p.fresh === 'OUT';
+    var w = IN ? (sh ? 'SHORT NOW' : 'BUY NOW') : OUT ? (sh ? 'COVER NOW' : 'SELL NOW') : p.open ? (sh ? 'IN SHORT' : 'IN TRADE') : 'WAIT', css = IN ? (sh ? 'sell' : 'buy') : OUT ? (sh ? 'buy' : 'sell') : p.open ? (sh ? 'sell' : 'buy') : 'idle';
+    var sub = IN ? (sh ? 'Sell short near ' : 'Buy near ') + money(p.next.buy) + (p.next.target ? '. Target ' + money(p.next.target) : '') + (p.next.stop ? '. Stop ' + money(p.next.stop) : '') + '.'
+      : OUT ? (sh ? 'Buy back near ' : 'Sell near ') + money(p.sold.price) + ': ' + WHY[p.sold.why] + '. This trade ' + pct(p.sold.pct) + ' after costs.'
+      : p.open ? (sh ? 'Shorted at ' : 'Bought at ') + money(p.open.entry) + ' on ' + when(p.open.t) + '. Now ' + pct(p.open.pct) + ' after costs.' + (p.open.half ? ' Half is already banked; the stop is at the entry price.' : ' Hold until the target, the stop or the exit signal.')
+      : 'No trade open. It waits for: ' + p.entry + '.';
+    var nowS = Date.now() / 1000, ageMin = Math.round((nowS - D.made) / 60), staleCopy = !CAN_FETCH || ageMin > 20, clock = function (x) { return new Date(x * 1000).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+    var whenLine = p.bt ? 'Signal from the ' + TFN[S.tf] + ' bar that closed at ' + clock(p.bt) + ' (' + Math.max(0, Math.round((nowS - p.bt) / 60)) + ' min ago).' : '';
+    if (IN || OUT || p.open) {
+      var was = w, lp = px[S.name], Rr = IN && p.next.stop ? Math.abs(p.next.buy - p.next.stop) : null, dirn = sh ? -1 : 1;
+      if (staleCopy) { w = 'STALE'; css = 'idle'; sub = 'This copy is ' + ageMin + ' minutes old. It said ' + was + ' at ' + clock(p.bt || D.made) + '. Do not act on it: open the live desk or wait for the phone alert.'; }
+      else if (IN && nowS > p.bt + p.tfs) { w = 'EXPIRED'; css = 'idle'; sub = 'The ' + was + ' signal ran out when the next bar closed (' + clock(p.bt + p.tfs) + ').'; }
+      else if (IN && Rr && lp && dirn * (lp - p.next.stop) <= 0) { w = 'INVALID'; css = 'idle'; sub = 'The price (' + money(lp) + ') has gone through the stop ' + money(p.next.stop) + '. The setup is cancelled.'; }
+      else if (IN && Rr && lp && dirn * (lp - p.next.buy) > 0.25 * Rr) { w = 'TOO LATE'; css = 'idle'; sub = 'The price (' + money(lp) + ') has left the entry zone (' + money(p.next.buy) + ' to ' + money(p.next.buy + dirn * 0.25 * Rr) + '). Chasing it changes the odds.'; }
+      else if (IN) whenLine += ' Valid until ' + clock(p.bt + p.tfs) + ', or until the price leaves the entry zone.';
+    }
+    var fu = ((D.LS || {}).units || []).filter(function (u) { return u.name === 'Plan: ' + BNAME[S.book] + ' ' + TFN[S.tf] + ' ' + TOLD[S.tier]; })[0];
+    var fwd = fu && fu.n ? 'Forward record since 15 Nov: ' + fu.wins + ' of ' + fu.n + ' closed trades won.' : 'Forward record: no closed trades yet, so this rests on the backtest alone.';
+    var rk = p.risk || { label: '?', why: [] }, rcss = rk.label === 'HIGH' ? 'sell' : rk.label === 'LOW' ? 'buy' : 'idle';
+    var g = p.g || {}, v = (p.paused ? '<span class="pill sell">ENTRIES PAUSED</span>' : '') + '<span class="pill line">' + TNAME[S.tier] + '</span><span class="pill ' + rcss + '" title="' + esc(rk.why.join('; ')) + '">LOSS RISK ' + rk.label + '</span>' + (p.ok ? '<span class="pill A">PASSED BACKTEST</span>' : g.ok ? '<span class="pill idle">NOT USED ON THIS COIN: no alerts</span>' : '<span class="pill idle">FAILED THE TEST: no alerts</span>')
+      + ' <span style="flex-basis:100%"></span>' + esc(whenLine) + ' Loss risk: ' + esc(rk.why.join('; ')) + '. ' + esc(fwd)
+      + ' Across ' + (g.coins || 0) + ' coins it won ' + (g.win == null ? 'no' : Math.round(g.win) + '% of ' + g.n) + ' trades on the newest prices' + (g.ret == null ? '' : ', and the basket made ' + pct0(g.ret) + ' (holding ' + pct0(g.hold) + '); ' + (g.up || 0) + ' of ' + (g.coins || 0) + ' coins made money') + '. On ' + esc(S.name) + ' alone: ' + Math.round(p.win) + '% of ' + p.n + ' trades.';
+    return '<div class="sig ' + css + (p.fresh && p.ok ? ' live' : '') + '">' + ring(p.win, !p.ok ? 'low' : S.tier === 'safe' ? 'A' : '') + '<div><div class="word">' + w + '</div><div class="sub">' + esc(sub) + '</div><div class="verdict">' + v + '</div></div></div>';
+  }
+  function planPrices(p) {
+    var sh = p.side === 'short', b = p.fresh === 'IN' ? p.next : p.open ? { buy: p.open.entry, target: p.open.target, stop: p.open.stop, half: p.open.half } : null, s = '<div class="card"><h3>Exactly where</h3>';
+    if (b) {
+      var d = function (x) { return pct((x / b.buy - 1) * 100); };
+      s += '<div class="px3"><div class="pxr b"><span class="k">' + (sh ? 'SHORT' : 'BUY') + '</span><span class="v">' + money(b.buy) + '</span><span class="d muted">' + (p.open ? (sh ? 'shorted' : 'bought') : 'near this price') + '</span></div>'
+        + '<div class="pxr t"><span class="k">TARGET' + (b.target2 ? ' 1' : b.half ? ' 2' : '') + '</span>' + (b.target ? '<span class="v">' + money(b.target) + '</span><span class="d">' + d(b.target) + '</span>' : '<span class="v txt">' + (p.kind === 'sig' ? 'none: exit on the plan signal' : 'none: it rides the move until the trailing stop') + '</span><span></span>') + '</div>'
+        + (b.target2 ? '<div class="pxr t"><span class="k">TARGET 2</span><span class="v">' + money(b.target2) + '</span><span class="d">' + d(b.target2) + '</span></div>' : '')
+        + '<div class="pxr s"><span class="k">STOP</span>' + (b.stop ? '<span class="v">' + money(b.stop) + '</span><span class="d">' + d(b.stop) + '</span>' : '<span class="v txt">none: this plan exits only on its signal</span><span></span>') + '</div></div>';
+      if (b.target2) s += '<p class="muted small" style="margin-bottom:8px">At target 1 take half off and move the stop to the entry price. The rest goes at target 2 or at break-even.</p>';
+      if (p.kind === 'trail' || p.kind === 'mid') s += '<p class="muted small" style="margin-bottom:8px">The stop trails: it follows the price your way and never moves back.</p>';
+      if (S.book !== 'spot' && b.stop) { var sd = Math.abs(b.stop / b.buy - 1) * 100;
+        s += '<div class="pxr" style="margin-bottom:10px"><span class="k">LEVERAGE</span><span class="v txt">The stop is ' + sd.toFixed(1) + '% away. Risking 2% of the account means a position worth <b style="color:var(--ink)">' + Math.round(Math.min(200 / sd, 2000)) + '% of the account</b>. ' + (function () { var ml = (D.ML || {})[S.name]; if (!ml) return 'No liquidation estimate: Hyperliquid has no limit on file for this coin.'; var l = 1 / (2 * ml), top = Math.max(1, Math.min(ml, Math.floor(1 / (l + 2 * sd / 100 * (1 + l))))); return 'By Hyperliquid rules (maximum ' + ml + 'x here), liquidation stays two stop-distances away up to <b style="color:var(--ink)">' + top + 'x</b>.'; })() + '</span><span></span></div>'; }
+    } else s += '<p class="why" style="margin-bottom:8px">Nothing to do now. When this plan fires, the entry price, the target and the stop appear here and on your phone.</p>';
+    return s + '<p class="muted small">' + esc(p.text) + '</p></div>';
+  }
+  function planProfit(p) {
+    var s = '<div class="card"><h3>Profit on the newest prices, after fees</h3><div class="grow"><div><b class="' + (p.ret >= 0 ? 'pos' : 'neg') + '">' + dollars(10000 * (1 + p.ret / 100)) + '</b><span>this plan, from $10,000</span></div><span class="vs">vs</span><div><b>' + dollars(10000 * (1 + p.hold / 100)) + '</b><span>just holding</span></div></div>';
+    s += spark(p.eq) + '<p class="muted small" style="margin-bottom:10px"><i class="sw" style="background:var(--gold)"></i> the plan &nbsp; <i class="sw" style="background:var(--faint)"></i> holding &nbsp; since ' + esc(when(p.split, false)) + '</p>';
+    s += '<div class="kv"><div><b class="' + (p.ret >= 0 ? 'pos' : 'neg') + '">' + pct0(p.ret) + '</b><span>return (' + pct0(p.yr) + ' a year)</span></div><div><b>' + Math.round(p.dd) + '%</b><span>worst fall (holding ' + Math.round(p.hdd) + '%)</span></div><div><b class="pos">+' + p.aw.toFixed(1) + '%</b><span>average win</span></div><div><b class="neg">-' + p.al.toFixed(1) + '%</b><span>average loss</span></div><div><b>' + (p.pf >= 99 ? 'no losses' : p.pf.toFixed(2)) + '</b><span>profit factor</span></div><div><b>' + Math.round(p.expo) + '%</b><span>of the time in a trade</span></div></div>';
+    return s + '<p class="muted small" style="margin-top:10px">Chance alone (the same target and stop after blind buys) wins ' + (p.cw == null ? '?' : Math.round(p.cw)) + '% and averages ' + (p.ca == null ? '?' : pct(p.ca)) + ' a trade. This plan averages ' + (p.avg == null ? '?' : pct(p.avg)) + '.</p></div>';
+  }
+  function levelsCard() {
+    var s = '<div class="card"><h3>Win levels on this chart, with their loss risk</h3><div class="lvh"><span></span><span>Wins</span><span>Newest profit</span><span>Worst fall</span></div>';
+    TIERS.forEach(function (t) {
+      var p = planAt(key(), t);
+      s += '<button class="lvl" data-tier="' + t + '" aria-current="' + (t === S.tier) + '" title="' + esc(TSAY[t]) + '"><span class="nm">' + TNAME[t] + (p && p.ok ? '<i class="okdot" title="passed the backtest"></i>' : '') + (p && p.risk ? '<span class="muted" style="font:600 10px var(--body)">risk ' + p.risk.label + '</span>' : '') + '</span>'
+        + (p ? '<span>' + Math.round(p.win) + '%</span><span class="' + (p.ret >= 0 ? 'pos' : 'neg') + '">' + pct0(p.ret) + '</span><span>' + Math.round(p.dd) + '%</span>' : '<span class="muted" style="grid-column:span 3;font:500 12px var(--body)">no plan clears it</span>') + '</button>';
+    });
+    return s + '<p class="muted small" style="margin-top:8px">A level says how OFTEN the plan wins, not how safe it is: the loss risk is its own label. Gold dot = passed the backtest (sends alerts). More wins usually means smaller wins; fewer wins can mean more profit and deeper falls. Tap a level.</p></div>';
+  }
+  function sigCard() {
+    var k = key(), ls = sel();
+    if (S.sys === 'plan') return planSig(planAt(k));
+    if (S.sys === 'perps') {
+      var c = D.perps[k], su = c.setups.filter(function (x) { return x.state === 'open'; })[0], sc = c.setups.filter(function (x) { return x.state === 'called'; })[0];
+      var word = su ? su.lev + 'x ' + su.side.toUpperCase() + ' OPEN' : sc ? sc.lev + 'x ' + sc.side.toUpperCase() + ' CALLED' : 'WAIT', css = su || sc ? ((su || sc).side === 'long' ? 'buy' : 'sell') : 'idle';
+      var best = c.setups.slice().sort(function (a, b) { return (b.win || 0) - (a.win || 0); })[0];
+      return '<div class="sig ' + css + '">' + ring(best ? best.win : null, best ? '' : 'off') + '<div><div class="word">' + esc(word) + '</div><div class="sub">' + esc(c.why) + '</div><div class="verdict">' + (best ? 'Ring: the best tested set-up on this chart. Chance alone would win ' + Math.round(best.chance) + '%.' : '') + '</div></div></div>';
+    }
+    if (S.sys === 'all') {
+      var q = D.qdss[k], qp = q.pick, g = qp && qp.qualifies ? (Math.min(qp.whole.win || 0, (qp.fee || {}).win || 0) >= 90 ? 'A' : 'B') : null;
+      var w2 = q.buy === 3 ? 'ALL BUY' : q.sell === 3 ? 'ALL SELL' : q.buy === 2 || q.sell === 2 ? 'GET READY' : 'WAIT';
+      return '<div class="sig ' + (q.buy === 3 ? 'buy' : q.sell === 3 ? 'sell' : 'idle') + '">' + ring(qp && qp.whole ? qp.whole.win : null, g === 'A' ? 'A' : g ? '' : 'low') + '<div><div class="word">' + w2 + '</div><div class="sub">' + esc(q.why) + '</div><div class="verdict">' + gradePill(g) + '</div></div></div>';
+    }
+    if (ls.length === 1 && ls[0] !== 'htf') {
+      var d = layerAt(ls[0], k), p = d.pick, gr = gradeOf(d);
+      var wd = d.fresh ? d.fresh + ' FLAG' : 'WAIT', sub = d.fresh ? 'Fired on the last finished bar at ' + money(d.price) + '.' : d.last ? 'Nothing new. The last flag was a ' + d.last[0] + ' on ' + when(d.last[1], false) + ' at ' + money(d.last[2]) + '.' : 'No flag in the loaded history.';
+      var v = !p ? 'Not tested yet.' : gradePill(gr) + ' ' + (p.whole.win != null ? Math.round(p.whole.win) + '% of ' + p.whole.sells + ' sells' : '') + (p.new && p.new.sells ? ', newest ' + Math.round(p.new.win) + '% of ' + p.new.sells : '') + (p.fee && p.fee.win != null ? ', after fees ' + Math.round(p.fee.win) + '%' + (p.fee.new_win != null ? ' (newest ' + Math.round(p.fee.new_win) + '%)' : '') : '') + '.' + (gr === 'A' ? ' Sends phone alerts.' : ' No phone alerts.');
+      if (ls[0] === 'opt') v += ' It is a stay-in / stay-out filter: stack it with ATR or Mean Reversion.';
+      return '<div class="sig ' + (d.fresh === 'BUY' ? 'buy' : d.fresh === 'SELL' ? 'sell' : 'idle') + (d.fresh ? ' live' : '') + '">' + ring(p && p.whole.win, gr === 'A' ? 'A' : gr ? '' : p && p.found ? 'low' : 'off') + '<div><div class="word">' + wd + '</div><div class="sub">' + esc(sub) + '</div><div class="verdict">' + v + '</div></div></div>';
+    }
+    if (ls.length === 1) {
+      var hl = leanOf('htf', k);
+      return '<div class="sig idle">' + ring(null, 'off') + '<div><div class="word">' + hl[0] + '</div><div class="sub">The ' + esc(hl[2]) + ' is ' + (hl[1] === 'up' ? 'blue: the bigger chart says stay in.' : 'orange: the bigger chart says stay out.') + '</div><div class="verdict">A filter with no signals of its own. Add ATR, Mean Reversion or Confluence.</div></div></div>';
+    }
+    var r = (D.C[k] || {})[stackKey()];
+    var cf = combine(ls, k, r ? r.w : 6), n = bars(k).length, fire = null;
+    if (cf && cf.buys.indexOf(n - 1) >= 0) fire = 'BUY'; else if (cf && cf.sells.indexOf(n - 1) >= 0) fire = 'SELL';
+    var agreeB = ls.filter(function (l) { var x = leanOf(l, k); return x[1] === 'buy' || x[1] === 'up'; }).length;
+    var word = fire ? 'STACK ' + fire : 'WAIT';
+    var subt = fire ? 'Every layer agrees on the last finished bar.' : agreeB + ' of ' + ls.length + ' layers lean buy right now. A stack buy needs all of them.';
+    var vv = !r ? (ls.every(function (l) { return !EVENT[l]; }) ? 'Trend layers alone give no buy or sell signal. Add ATR, Mean Reversion or Confluence.' : 'This stack has not been tested on this chart yet.')
+      : gradePill(r.g) + ' ' + Math.round(r.win) + '% of ' + r.ws + ' sells, newest ' + (r.nw == null ? '-' : Math.round(r.nw) + '% of ' + r.ns) + ', after fees ' + (r.fw == null ? '-' : Math.round(r.fw) + '%') + (r.fnw != null ? ' (newest ' + Math.round(r.fnw) + '%)' : '') + '.' + (r.g === 'A' ? ' Sends phone alerts.' : ' No phone alerts.');
+    return '<div class="sig ' + (fire === 'BUY' ? 'buy' : fire === 'SELL' ? 'sell' : 'idle') + (fire ? ' live' : '') + '">' + ring(r ? r.win : null, r && r.g === 'A' ? 'A' : r && r.g ? '' : r ? 'low' : 'off') + '<div><div class="word">' + word + '</div><div class="sub">' + esc(subt) + '</div><div class="verdict">' + vv + '</div></div></div>';
+  }
+  function membersCard() {
+    var k = key(), ls = sel();
+    var s = '<div class="card"><h3>' + (ls.length === 1 ? 'The layer' : 'The layers in your stack') + '</h3>';
+    ls.forEach(function (l) {
+      var x = leanOf(l, k), d = layerAt(l, k), g = l === 'htf' ? null : gradeOf(d);
+      s += '<div class="mem"><div><div class="nm">' + LNAME[l] + '</div><div class="st">' + esc(x[2]) + '</div></div><span class="pill ' + (x[1] === 'line' ? 'line' : x[1]) + '">' + esc(x[0]) + '</span><span class="pill ' + (g || 'line') + '">' + (g ? g : l === 'htf' ? 'filter' : '-') + '</span></div>';
+    });
+    if (ls.length === 1 && ls[0] !== 'htf') s += '<p class="why" style="margin-top:8px">' + esc(layerAt(ls[0], k).why) + '</p>';
+    return s + '<p class="muted small" style="margin-top:8px">Tap the chips at the top to add or remove layers. The chart and the tested win ratio change with them. These win ratios count partial sales, not whole trades, and leave out unsold losing lots: one such pick showed 98% by sales and 3 of 5 as whole trades. Trade plans count whole trades.</p></div>';
+  }
+  function bestStacksCard() {
+    var k = key(), all = D.C[k] || {}, cur = stackKey();
+    var rows = Object.keys(all).map(function (sk) { return [sk, all[sk]]; }).filter(function (x) { return x[1].g; });
+    var singles = OVER.filter(function (l) { var d = layerAt(l, k); return l !== 'htf' && d && d.ab; }).map(function (l) { var d = layerAt(l, k); return [l, { g: d.ab, win: d.pick.whole.win, fnw: d.pick.fee ? d.pick.fee.new_win : 0 }]; });
+    var both = singles.concat(rows);
+    both.sort(function (a, b) { return (a[1].g === b[1].g ? 0 : a[1].g === 'A' ? -1 : 1) || (b[1].fnw || 0) - (a[1].fnw || 0) || (b[1].win || 0) - (a[1].win || 0); });
+    var s = '<div class="card"><h3>The best picks on this chart</h3>';
+    if (!both.length) return s + '<p class="muted">Nothing reaches 80% on this chart after fees. On fast charts the fee eats the small wins: try a slower timeframe, or stack with BIG TREND.</p></div>';
+    both.slice(0, 10).forEach(function (x) {
+      var sk = x[0], r = x[1];
+      s += '<button class="srow" data-stack="' + esc(sk) + '" aria-current="' + (sk === cur) + '"><span class="nm">' + esc(sk.split('+').map(function (l) { return LNAME[l]; }).join(' + ')) + '</span><span class="pill ' + r.g + '">' + r.g + '</span><span class="wr">' + Math.round(r.win) + '%</span></button>';
+    });
+    return s + '<p class="muted small" style="margin-top:8px">Gold A = 90%+ on old prices, new prices and after fees: these send alerts. Green B = 80%+. Tap one to load it.</p></div>';
+  }
+
+  // ── top, watchlist, toolbar ──────────────────────────────────────────────
+  function renderTop() {
+    var k = key(), ls = sel(), stackMode = S.sys === 'stack';
+    var h = (have('plan') ? '<button class="lay sysb" data-sys="plan" aria-pressed="' + (S.sys === 'plan') + '">TRADE PLANS</button><span class="sep"></span>' : '') + OVER.map(function (l) {
+      if (l === 'htf' && !htfOk()) return '';
+      var on = stackMode && ls.indexOf(l) >= 0, extra = '';
+      if (l === 'htf') { var hd = D.H[k]; extra = '<i class="dotp ' + (hd.dirs[hd.dirs.length - 1] === 1 ? 'up' : 'dn') + '"></i>'; }
+      else {
+        var d = layerAt(l, k);
+        if (d) {
+          if (d.fresh && d.ab) extra += '<i class="dotp fresh' + (d.fresh === 'SELL' ? ' s' : '') + '"></i>';
+          if (l === 'opt' && d.ov && d.ov.rib) extra += '<i class="dotp ' + (d.ov.rib[d.ov.rib.length - 1][2] === 1 ? 'up' : 'dn') + '"></i>';
+          if (d.ab) extra += '<span class="n ' + d.ab + '">' + d.ab + ' ' + winOf(d) + '%</span>';
+        }
+      }
+      return '<button class="lay" data-toggle="' + l + '" aria-pressed="' + on + '"><span class="tick">&#10003;</span>' + LNAME[l] + extra + '</button>';
+    }).join('') + '<span class="sep"></span>' + ['all', 'perps'].filter(have).map(function (x) { return '<button class="lay sysb" data-sys="' + x + '" aria-pressed="' + (S.sys === x) + '">' + LNAME[x] + '</button>'; }).join('');
+    $('layers').innerHTML = h;
+    var b = bars(k), prev = b.length > 1 ? b[b.length - 2][4] : null, p = px[S.name] || (b.length ? b[b.length - 1][4] : null), ch = prev && p ? (p / prev - 1) * 100 : null;
+    var what = S.sys === 'stack' ? ls.map(function (l) { return LNAME[l]; }).join(' + ') : S.sys === 'plan' ? BNAME[S.book] + ' · ' + TNAME[S.tier] + ' plan' : LNAME[S.sys];
+    $('symbol').innerHTML = '<span class="name">' + esc(S.name) + '</span><span class="sub">' + esc(TFN[S.tf]) + ' &middot; ' + esc(what) + '</span><span class="live" id="liveprice">' + money(p) + '</span><span class="chg ' + (ch >= 0 ? 'pos' : 'neg') + '" id="chg">' + (ch == null ? '' : pct(ch) + ' vs the bar before') + '</span>';
+    paintStatus();
+  }
+  function paintStatus() {
+    var age = (Date.now() / 1000 - D.made) / 60, stale = age > 20, el = $('status');
+    el.className = 'status' + (stale ? ' stale' : '');
+    el.innerHTML = '<span class="livedot' + (CAN_FETCH && !stale ? ' on' : '') + '"></span>' + (CAN_FETCH ? (feedOn ? 'Live' : 'Live prices') : 'Snapshot') + ' &middot; ' + esc(when(D.made)) + (stale ? ' (' + Math.round(age) + ' min old)' : '');
+  }
+  function renderWatch() {
+    var sys = S.sys, tfs = TFS.filter(function (tf) { return Object.keys(LD(sys)).some(function (k) { return k.split('|')[1] === tf; }); });
+    var h = '<div class="whead"><span>Coin</span><span style="text-align:right">Price</span><span class="tfl">' + tfs.map(function (tf) { return '<span>' + TFL[tf] + '</span>'; }).join('') + '</span></div>';
+    names(sys).forEach(function (nm) {
+      var bb = bars(nm + '|' + tfsOf(sys, nm)[0]);
+      h += '<div class="wrow" data-on="' + (nm === S.name) + '"><button class="wmain" data-coin="' + esc(nm) + '"><span class="sym">' + esc(nm) + '</span><span class="px" id="px-' + esc(nm) + '">' + money(px[nm] || (bb.length ? bb[bb.length - 1][4] : null)) + '</span></button><span class="wsq">' + tfs.map(function (tf) { return sqBtn(sys, nm, tf, nm === S.name && tf === S.tf); }).join('') + '</span></div>';
+    });
+    h += sys === 'perps' ? '<div class="wkey"><span><i class="sq long"></i>long open</span><span><i class="sq short"></i>short open</span><span><i class="sq called-long"></i>just called</span><span><i class="sq"></i>waiting</span><span><i class="sq none"></i>no set-up</span></div>'
+      : sys === 'plan' ? '<div class="wkey"><span><i class="sq long"></i>buy or cover now</span><span><i class="sq short"></i>sell or short now</span><span><i class="sq b2"></i>in a trade</span><span><i class="sq gA"></i>confirmed, waiting (number = wins %)</span><span><i class="sq none"></i>no confirmed plan</span></div>'
+      : sys === 'all' ? '<div class="wkey"><span><i class="sq long"></i>ALL BUY</span><span><i class="sq short"></i>ALL SELL</span><span><i class="sq b2"></i>2 of 3 buy lights</span><span><i class="sq s2"></i>2 of 3 sell lights</span></div>'
+      : '<div class="wkey"><span><i class="sq gA"></i>grade A, sends alerts</span><span><i class="sq gB"></i>grade B</span><span><i class="sq long"></i>buy flag now</span><span><i class="sq short"></i>sell flag now</span><span><i class="sq none"></i>below 80%</span></div>';
+    $('watch').innerHTML = h;
+  }
+  function renderToolbar() {
+    $('toolbar').innerHTML = tfsOf(S.sys, S.name).map(function (tf) { return '<button class="tfb" data-tf="' + tf + '" aria-pressed="' + (tf === S.tf) + '">' + TFL[tf] + '</button>'; }).join('')
+      + (S.sys === 'plan' ? '<span class="tiers" role="group" aria-label="Book">' + BOOKS.map(function (b) { return '<button class="tierb" data-book="' + b + '" aria-pressed="' + (b === S.book) + '" title="' + esc(BSAY[b]) + '">' + BSHORT[b] + '</button>'; }).join('') + '</span>' : '')
+      + (S.sys === 'plan' ? '<span class="tiers" role="group" aria-label="Risk level">' + TIERS.map(function (t) { return '<button class="tierb" data-tier="' + t + '" aria-pressed="' + (t === S.tier) + '" title="' + esc(TSAY[t]) + '">' + TNAME[t] + '</button>'; }).join('') + '</span>' : '')
+      + '<button class="tool" data-fit="1">Reset view</button>';
+    var k = [], ls = sel();
+    if (S.sys === 'plan') k.push('<span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 0l6 10H0z" fill="var(--buy)"/></svg>BUY or SHORT: where the plan got in</span><span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 10L0 0h12z" fill="var(--buy)"/></svg>where it got out, with the result</span><span><i class="sw" style="width:8px;border-radius:50%;background:var(--faint)"></i>a signal the plan said NO to</span><span>dashed lines: the open trade\'s buy, target and stop</span><span><i class="sw" style="background:linear-gradient(90deg,var(--up),var(--down))"></i>trend ribbon: blue up, orange down</span>');
+    else if (S.sys === 'perps') k.push('<span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 0l6 10H0z" fill="var(--buy)"/></svg>L: a long set-up fired</span><span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 10L0 0h12z" fill="var(--sell)"/></svg>S: a short set-up fired</span><span>dashed: an open trade\'s entry, target, stop</span>');
+    else if (S.sys === 'all') k.push('<span>labels: ALL BUY / ALL SELL (3 lights)</span><span>lower panes: Confluence and Mean Reversion</span>');
+    else {
+      k.push(ls.length > 1 ? '<span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 0l6 10H0z" fill="var(--gold)"/></svg>STACK BUY: every layer agrees</span><span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 10L0 0h12z" fill="var(--sell)"/></svg>sell</span>' : '<span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 0l6 10H0z" fill="var(--buy)"/></svg>buy flag</span><span><svg width="11" height="9" viewBox="0 0 12 10"><path d="M6 10L0 0h12z" fill="var(--sell)"/></svg>sell flag</span>');
+      if (ls.indexOf('atr') >= 0) k.push('<span style="color:var(--dial)">L0 to L6: ATR levels</span><span><i class="sw" style="background:linear-gradient(90deg,var(--up),var(--down))"></i>ATR trend cloud</span>');
+      if (ls.indexOf('opt') >= 0) k.push('<span><i class="sw" style="background:linear-gradient(90deg,var(--up),var(--down))"></i>Optimized Trend ribbon: blue in, orange out</span>');
+      if (ls.indexOf('trend') >= 0) k.push('<span>line: trend</span>');
+      if (ls.indexOf('htf') >= 0) k.push('<span><i class="sw" style="background:linear-gradient(90deg,var(--up),var(--down))"></i>strip: ' + esc(D.H[key()].big) + ' big trend</span>');
+      if (ls.indexOf('mr') >= 0) k.push('<span>Mean Reversion pane: dots = flags</span>');
+      if (ls.indexOf('conf') >= 0) k.push('<span>Confluence pane: buy / sell conditions out of 4</span>');
+    }
+    $('keyline').innerHTML = k.join('');
+  }
+
+  // ── the chart ────────────────────────────────────────────────────────────
+  function Ribbon(pts, upHex, dnHex, alpha) {        // a filled band between two lines, coloured bar by bar (his Optimized Trend and ATR cloud)
+    var chart = null, series = null;
+    this.attached = function (p) { chart = p.chart; series = p.series; };
+    this.detached = function () { chart = null; series = null; };
+    this.updateAllViews = function () {};
+    var up = rgba(upHex, alpha), dn = rgba(dnHex, alpha);
+    var renderer = { draw: function (target) {
+      target.useMediaCoordinateSpace(function (scope) {
+        if (!chart || !series) return;
+        var ctx = scope.context, ts = chart.timeScale(), i;
+        for (i = 1; i < pts.length; i++) {
+          var p0 = pts[i - 1], p1 = pts[i];
+          if (p0.a == null || p1.a == null || p0.b == null || p1.b == null) continue;
+          var x0 = ts.timeToCoordinate(p0.t), x1 = ts.timeToCoordinate(p1.t);
+          if (x0 == null || x1 == null) continue;
+          var a0 = series.priceToCoordinate(p0.a), b0 = series.priceToCoordinate(p0.b), a1 = series.priceToCoordinate(p1.a), b1 = series.priceToCoordinate(p1.b);
+          if (a0 == null || b0 == null || a1 == null || b1 == null) continue;
+          ctx.fillStyle = p1.d === 1 ? up : dn;
+          ctx.beginPath(); ctx.moveTo(x0, a0); ctx.lineTo(x1 + 0.5, a1); ctx.lineTo(x1 + 0.5, b1); ctx.lineTo(x0, b0); ctx.closePath(); ctx.fill();
+        }
+      });
+    } };
+    var view = { renderer: function () { return renderer; }, zOrder: function () { return 'bottom'; } };
+    this.paneViews = function () { return [view]; };
+  }
+  function ohlc(b) { $('ohlc').innerHTML = b ? '<span>O <b>' + money(b.open) + '</b></span><span>H <b>' + money(b.high) + '</b></span><span>L <b>' + money(b.low) + '</b></span><span>C <b>' + money(b.close) + '</b></span>' : ''; }
+  function mount() {
+    if (lw) { try { lw.chart.remove(); } catch (e) {} lw = null; }
+    var el = $('lw'), k = key(), b0 = bars(k), sys = S.sys, ls = sel();
+    $('panes').innerHTML = '';
+    if (!LW || !b0.length) { el.innerHTML = '<div class="nochart">' + (LW ? 'No price history for this chart yet.' : 'The chart needs an internet connection to load its drawing tool. The signal and the numbers on the right are still up to date.') + '</div>'; return; }
+    el.innerHTML = ''; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+    var buy = cssv('--buy'), sell = cssv('--sell'), upc = cssv('--up'), dnc = cssv('--down'), n = b0.length, last = b0[n - 1][4];
+    var prec = last >= 10000 ? 0 : last >= 100 ? 2 : last >= 1 ? 3 : last >= 0.01 ? 5 : 8;
+    function T(i) { return b0[i][0] + TZ; }
+    var none = function () { return null; };
+    var ch = LW.createChart(el, { width: Math.max(el.clientWidth, 60), height: Math.max(el.clientHeight, 60), layout: { background: { type: 'solid', color: cssv('--bg') }, textColor: cssv('--muted'), fontFamily: 'Inter, "Segoe UI", system-ui, sans-serif', fontSize: 11 },
+      grid: { vertLines: { color: cssv('--panel-2') }, horzLines: { color: cssv('--panel-2') } }, rightPriceScale: { borderColor: cssv('--line') }, crosshair: { mode: 0 },
+      timeScale: { borderColor: cssv('--line'), timeVisible: S.tf !== '1d', secondsVisible: false, rightOffset: 5 } });
+    var stackMode = sys === 'stack', has = function (l) { return stackMode && ls.indexOf(l) >= 0; };
+    var atr = has('atr') ? layerAt('atr', k) : null;
+    if (atr && atr.bear) {                            // a red tint behind the candles while the big-picture trend is down
+      var bg = ch.addAreaSeries({ priceScaleId: 'bg', topColor: 'rgba(240, 80, 110, 0.09)', bottomColor: 'rgba(240, 80, 110, 0.09)', lineColor: 'rgba(0, 0, 0, 0)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: function () { return { priceRange: { minValue: 0, maxValue: 1 } }; } });
+      ch.priceScale('bg').applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+      bg.setData(atr.bear.map(function (v, i) { return v ? { time: T(i), value: 1 } : { time: T(i) }; }));
+    }
+    var cs = ch.addCandlestickSeries({ upColor: buy, downColor: sell, wickUpColor: buy, wickDownColor: sell, borderVisible: false, priceFormat: { type: 'price', precision: prec, minMove: Math.pow(10, -prec) } });
+    var data = b0.map(function (b) { return { time: b[0] + TZ, open: b[1], high: b[2], low: b[3], close: b[4] }; });
+    cs.setData(data);
+    var q = (D.qdss || {})[k], qp = q && q.panes && q.bars.length === n ? q.panes : null;
+    var showConf = null, showZ = null;
+    if ((sys === 'all' || sys === 'perps') && qp) { showConf = { conf: qp.conf, cb: qp.cb, cs: qp.cs }; showZ = { z: qp.z, level: qp.level, mb: qp.mb, ms: qp.ms }; }
+    var mr = has('mr') ? layerAt('mr', k) : null, cf = has('conf') ? layerAt('conf', k) : null;
+    if (cf && cf.ov && cf.ov.conf) showConf = { conf: cf.ov.conf, cb: cf.buys, cs: cf.sells };
+    if (mr && mr.ov && mr.ov.z) showZ = { z: mr.ov.z, level: mr.ov.level, mb: mr.buys, ms: mr.sells };
+    var two = showConf && showZ, one = (showConf || showZ) && !two, strip = has('htf');
+    cs.priceScale().applyOptions({ scaleMargins: two ? { top: 0.05, bottom: 0.46 } : one ? { top: 0.05, bottom: 0.38 } : { top: 0.06, bottom: strip ? 0.1 : 0.06 } });
+    function line(arr) {
+      var ln = ch.addLineSeries({ lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: none });
+      ln.setData(arr.map(function (p, i) { return p[0] != null ? { time: T(i), value: p[0], color: p[1] === 1 ? upc : dnc } : { time: T(i) }; }));
+    }
+    function ribbon(fast, slow, dirs, alpha) {        // two edge lines plus the filled band between them
+      var pts = fast.map(function (f, i) { return { t: T(i), a: f, b: slow[i], d: dirs[i] }; });
+      if (cs.attachPrimitive) cs.attachPrimitive(new Ribbon(pts, upc, dnc, alpha));
+      [fast, slow].forEach(function (arr, z) {
+        var ln = ch.addLineSeries({ lineWidth: z ? 1 : 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: none });
+        ln.setData(arr.map(function (v, i) { return v == null ? { time: T(i) } : { time: T(i), value: v, color: rgba(dirs[i] === 1 ? upc : dnc, z ? 0.55 : 0.95) }; }));
+      });
+    }
+    var marks = [];
+    if (sys === 'perps') {
+      var c = D.perps[k];
+      line(c.line);
+      c.longs.forEach(function (j) { marks.push({ time: T(j), position: 'belowBar', color: buy, shape: 'arrowUp', text: 'L' }); });
+      c.shorts.forEach(function (j) { marks.push({ time: T(j), position: 'aboveBar', color: sell, shape: 'arrowDown', text: 'S' }); });
+      var su = c.setups.filter(function (x) { return x.state === 'open'; })[0] || c.setups.filter(function (x) { return x.state === 'called'; })[0];
+      if (su && su.lines) [['entry', '--ink'], ['target', '--buy'], ['stop', '--sell'], ['late', '--warn']].forEach(function (kk) {
+        if (su.lines[kk[0]]) cs.createPriceLine({ price: su.lines[kk[0]], color: cssv(kk[1]), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: su.lev + 'x ' + (kk[0] === 'late' ? 'too late' : kk[0]) });
+      });
+    } else if (sys === 'plan') {
+      var pp = planAt(k), po = layerAt('opt', k);
+      if (po && po.ov && po.ov.rib && po.ov.rib.length === n) ribbon(po.ov.rib.map(function (r) { return r[0]; }), po.ov.rib.map(function (r) { return r[1]; }), po.ov.rib.map(function (r) { return r[2]; }), 0.32);
+      if (pp) {
+        pp.skip.forEach(function (j) { if (j >= 0 && j < n) marks.push({ time: T(j), position: 'belowBar', color: cssv('--faint'), shape: 'circle', size: 0.4 }); });
+        var sh = pp.side === 'short', inM = function (i) { return { time: T(i), position: sh ? 'aboveBar' : 'belowBar', color: sh ? sell : buy, shape: sh ? 'arrowDown' : 'arrowUp', text: sh ? 'SHORT' : 'BUY' }; };
+        pp.tr.forEach(function (tr) {
+          if (tr[0] >= 0 && tr[0] < n) marks.push(inM(tr[0]));
+          if (tr[2] >= 0 && tr[2] < n) marks.push({ time: T(tr[2]), position: sh ? 'belowBar' : 'aboveBar', color: tr[4] > 0 ? buy : sell, shape: sh ? 'arrowUp' : 'arrowDown', text: (tr[4] > 0 ? '+' : '') + tr[4].toFixed(1) + '%' });
+        });
+        if (pp.open && pp.open.i >= 0 && pp.open.i < n) marks.push(inM(pp.open.i));
+        var lv = pp.fresh === 'IN' ? pp.next : pp.open ? { buy: pp.open.entry, target: pp.open.target, stop: pp.open.stop } : null;
+        if (lv) [['buy', '--ink', 'entry'], ['target', '--buy', 'target'], ['target2', '--buy', 'target 2'], ['stop', '--sell', 'stop']].forEach(function (kk) {
+          if (lv[kk[0]]) cs.createPriceLine({ price: lv[kk[0]], color: cssv(kk[1]), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: kk[2] });
+        });
+      }
+    } else if (sys === 'all') {
+      if (qp) line(qp.line);
+      q.marks.forEach(function (m) {
+        var kk = m[1], bb = /BUY|COVER/.test(kk), t = T(m[0]), pos = bb ? 'belowBar' : 'aboveBar';
+        if (kk.indexOf('GET READY') === 0) marks.push({ time: t, position: pos, color: bb ? buy : sell, shape: 'circle', size: 0.5 });
+        else if (kk.indexOf('DIALED') === 0) marks.push({ time: t, position: pos, color: cssv('--dial'), shape: 'square', size: 0.7 });
+        else marks.push({ time: t, position: pos, color: bb ? buy : sell, shape: bb ? 'arrowUp' : 'arrowDown', text: kk });
+      });
+    } else {
+      if (atr) {
+        FIB.forEach(function (f, kk) {
+          var lv = ch.addLineSeries({ color: cssv('--dial'), lineWidth: 1, lineType: 1, priceLineVisible: false, lastValueVisible: !(showConf || showZ), title: 'L' + kk, crosshairMarkerVisible: false, autoscaleInfoProvider: none });
+          lv.setData(atr.ath.map(function (v, i) { return { time: T(i), value: v * f }; }));
+        });
+        ribbon(atr.fast, atr.slow, atr.dirs, 0.30);
+      }
+      var op = has('opt') ? layerAt('opt', k) : null;
+      if (op && op.ov && op.ov.rib) ribbon(op.ov.rib.map(function (r) { return r[0]; }), op.ov.rib.map(function (r) { return r[1]; }), op.ov.rib.map(function (r) { return r[2]; }), 0.45);
+      var tr = has('trend') ? layerAt('trend', k) : null;
+      if (tr && tr.ov && tr.ov.line) line(tr.ov.line);
+      if (strip) {                                    // the big trend: a strip along the bottom of the price area
+        var hd = D.H[k];
+        var hs = ch.addHistogramSeries({ priceScaleId: 'htf', priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: function () { return { priceRange: { minValue: 0, maxValue: 1 } }; } });
+        ch.priceScale('htf').applyOptions({ scaleMargins: two ? { top: 0.52, bottom: 0.455 } : one ? { top: 0.6, bottom: 0.375 } : { top: 0.965, bottom: 0.0 } });
+        hs.setData(hd.dirs.map(function (v, i) { return { time: T(i), value: 1, color: rgba(v === 1 ? upc : dnc, 0.85) }; }));
+      }
+      if (ls.length === 1 && ls[0] !== 'htf') {
+        var d1 = layerAt(ls[0], k);
+        d1.buys.forEach(function (j) { marks.push({ time: T(j), position: 'belowBar', color: buy, shape: 'arrowUp', text: 'buy' }); });
+        d1.sells.forEach(function (j) { marks.push({ time: T(j), position: 'aboveBar', color: sell, shape: 'arrowDown', text: 'sell' }); });
+      } else if (ls.length > 1) {
+        var r = (D.C[k] || {})[stackKey()], cmb = combine(ls, k, r ? r.w : 6);
+        if (cmb) {
+          cmb.buys.forEach(function (j) { marks.push({ time: T(j), position: 'belowBar', color: cssv('--gold'), shape: 'arrowUp', text: 'STACK BUY' }); });
+          cmb.sells.forEach(function (j) { marks.push({ time: T(j), position: 'aboveBar', color: sell, shape: 'arrowDown', text: 'sell' }); });
+        }
+      }
+    }
+    marks.sort(function (a, b) { return a.time - b.time; });
+    cs.setMarkers(marks);
+    var top1 = two ? 0.58 : 0.66, html = '';
+    if (showConf) {                                   // Confluence pane: green columns = buy conditions met (0 to 4), red = sell conditions; a triangle = the flag
+      var fixed4 = function () { return { priceRange: { minValue: -4.6, maxValue: 4.6 } }; };
+      var hb = ch.addHistogramSeries({ priceScaleId: 'conf', color: buy, priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: fixed4 });
+      var hs2 = ch.addHistogramSeries({ priceScaleId: 'conf', color: sell, priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: fixed4 });
+      ch.priceScale('conf').applyOptions({ scaleMargins: { top: top1, bottom: two ? 0.25 : 0.03 } });
+      hb.setData(showConf.conf.map(function (v, i) { return { time: T(i), value: v[0] }; }));
+      hs2.setData(showConf.conf.map(function (v, i) { return { time: T(i), value: -v[1] }; }));
+      hb.setMarkers(showConf.cb.map(function (i) { return { time: T(i), position: 'aboveBar', color: buy, shape: 'arrowUp', size: 0.9 }; }));
+      hs2.setMarkers(showConf.cs.map(function (i) { return { time: T(i), position: 'belowBar', color: sell, shape: 'arrowDown', size: 0.9 }; }));
+      var lc = showConf.conf[n - 1];
+      html += '<div class="psep" style="top:' + (two ? 56 : 64) + '%"></div><div class="plabel" style="top:calc(' + (two ? 56 : 64) + '% + 4px)"><b>Confluence</b> buy ' + lc[0] + ' of 4, sell ' + lc[1] + ' of 4</div>';
+    }
+    if (showZ) {                                      // Mean Reversion pane, drawn like his: one line, a shaded sell zone on top and a buy zone below, dots on the line
+      var zmax = showZ.level + 1.6; showZ.z.forEach(function (v) { if (v != null && Math.abs(v) + 0.3 > zmax) zmax = Math.abs(v) + 0.3; });
+      var zr = function () { return { priceRange: { minValue: -zmax, maxValue: zmax } }; }, zm = { top: two ? 0.78 : top1, bottom: 0.03 }, L = showZ.level;
+      [[L, L + 1, 'top', sell], [-L, -L - 1, 'bottom', buy]].forEach(function (zz) {
+        var o = { priceScaleId: 'mr', baseValue: { type: 'price', price: zz[0] }, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: zr,
+          topLineColor: 'rgba(0,0,0,0)', bottomLineColor: 'rgba(0,0,0,0)', topFillColor1: 'rgba(0,0,0,0)', topFillColor2: 'rgba(0,0,0,0)', bottomFillColor1: 'rgba(0,0,0,0)', bottomFillColor2: 'rgba(0,0,0,0)' };
+        if (zz[2] === 'top') { o.topFillColor1 = rgba(zz[3], 0.28); o.topFillColor2 = rgba(zz[3], 0.28); } else { o.bottomFillColor1 = rgba(zz[3], 0.28); o.bottomFillColor2 = rgba(zz[3], 0.28); }
+        var bs = ch.addBaselineSeries(o);
+        bs.setData(showZ.z.map(function (v, i) { return { time: T(i), value: zz[1] }; }));
+      });
+      var zs = ch.addLineSeries({ priceScaleId: 'mr', color: cssv('--up'), lineWidth: 2, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, autoscaleInfoProvider: zr });
+      ch.priceScale('mr').applyOptions({ scaleMargins: zm });
+      zs.setData(showZ.z.map(function (v, i) { return v == null ? { time: T(i) } : { time: T(i), value: v }; }));
+      [[L, '--sell'], [-L, '--buy'], [L + 1, '--sell'], [-L - 1, '--buy'], [0, '--faint']].forEach(function (lv) { zs.createPriceLine({ price: lv[0], color: rgba(cssv(lv[1]), 0.6), lineWidth: 1, lineStyle: 2, axisLabelVisible: false }); });
+      var dots = showZ.mb.map(function (i) { return { time: T(i), position: 'inBar', color: buy, shape: 'circle', size: 1 }; }).concat(showZ.ms.map(function (i) { return { time: T(i), position: 'inBar', color: sell, shape: 'circle', size: 1 }; }));
+      dots.sort(function (a, b) { return a.time - b.time; });
+      zs.setMarkers(dots);
+      var lz = showZ.z[n - 1], zt = two ? 76 : 64;
+      html += '<div class="psep" style="top:' + zt + '%"></div><div class="plabel" style="top:calc(' + zt + '% + 4px)"><b>Mean Reversion</b> ' + (lz == null ? '-' : (lz > 0 ? '+' : '') + lz.toFixed(2) + ' standard deviations from the mean') + '</div>';
+    }
+    if (html) {
+      $('panes').innerHTML = '<div class="pmask" id="pmask" style="top:' + (two ? 56 : 64) + '%"></div>' + html;
+      [80, 700, 2500].forEach(function (ms) { setTimeout(function () {
+        var m = $('pmask'); if (!m || !lw || lw.chart !== ch) return;
+        try { var w = ch.priceScale('right').width(), h = ch.timeScale().height(); if (w > 30) m.style.width = w + 'px'; if (h > 10) m.style.bottom = h + 'px'; } catch (e) {}
+      }, ms); });
+    }
+    var show = window.innerWidth < 700 ? 70 : 140, range = { from: n - show, to: n + 5 };
+    try { var kept = JSON.parse(sessionStorage.getItem('qdss-range') || 'null'); if (kept && kept.key === k) range = kept.range; } catch (e) {}
+    ch.timeScale().setVisibleLogicalRange(range);
+    ch.timeScale().subscribeVisibleLogicalRangeChange(function (rr) { if (rr) { try { sessionStorage.setItem('qdss-range', JSON.stringify({ key: k, range: rr })); } catch (e) {} } });
+    lw = { chart: ch, series: cs, key: k, form: null, n: n, show: show, last: data[n - 1], tf: S.tf };
+    ohlc(lw.last);
+    ch.subscribeCrosshairMove(function (p) { var b = p && p.seriesData ? p.seriesData.get(cs) : null; ohlc(b || (lw && (lw.form || lw.last))); });
+    if (px[S.name]) livePrice(S.name, px[S.name]);
+  }
+  function livePrice(name, p) {
+    px[name] = p;
+    var e = $('px-' + name);
+    if (e) e.textContent = money(p);
+    if (name !== S.name) return;
+    var lp = $('liveprice'), b = bars(key()), prev = b.length > 1 ? b[b.length - 2][4] : null;
+    if (lp) lp.textContent = money(p);
+    if ($('chg') && prev) { var d = (p / prev - 1) * 100; $('chg').textContent = pct(d) + ' vs the bar before'; $('chg').className = 'chg ' + (d >= 0 ? 'pos' : 'neg'); }
+    if (!lw || lw.key !== key() || !b.length) return;
+    var last = b[b.length - 1], f = lw.form || (lw.form = { time: last[0] + SECS[lw.tf] + TZ, open: last[4], high: last[4], low: last[4], close: last[4] });
+    f.close = p; f.high = Math.max(f.high, p); f.low = Math.min(f.low, p);
+    try { lw.series.update(f); } catch (err) {}
+  }
+  function pollPrices() {
+    if (!CAN_FETCH || document.hidden) return;
+    (D.coins || []).forEach(function (nm, i) {
+      setTimeout(function () {
+        fetch('https://api.exchange.coinbase.com/products/' + nm + '-USD/ticker').then(function (r) { return r.json(); }).then(function (d) { var p = parseFloat(d.price); if (p > 0) livePrice(nm, p); }).catch(function () {});
+      }, i * 250);
+    });
+  }
+
+  // ── right panel ──────────────────────────────────────────────────────────
+  var HOW = {
+    atr: ['ATR', 'Purple lines L0 to L6 sit at 0, 23.6%, 38.2%, 50%, 61.8%, 76.4% and 100% of the all-time high: support below the price, resistance above. The shaded cloud is its trend: blue up, orange down. Buy and sell flags are its calls. His guide says it is built for the daily chart (also 12-hour and 8-hour), not for scalping.'],
+    mr: ['MEAN REV', 'The lower pane shows how many standard deviations the price is from its mean. In the green zone it is stretched low, in the red zone stretched high. A green dot = it was stretched low and has turned up (buy); a red dot = the same at the top (sell).'],
+    opt: ['OPT TREND', 'The ribbon hugging the price, tuned to this coin and timeframe. Blue = stay in, orange = stay out. On its own it wins fewer than half its trades (it rides moves and cuts falls); its value is as a filter: stack it with ATR or Mean Reversion so buys only count while it is blue.'],
+    trend: ['TREND', 'The line is the trend. Blue under the price = up, orange over it = down. A flag is the line flipping.'],
+    conf: ['CONFLUENCE', 'The lower pane counts four things on each side: price at the edge of its range, RSI at an extreme, Stochastic at an extreme, momentum turning. A flag fires when enough agree.'],
+    htf: ['BIG TREND', 'The Optimized Trend ribbon of the next timeframe up (4-hour behind 15-minute and 1-hour, daily behind 4-hour to 12-hour), shown as the strip under the candles. Stack it to take buys only while the bigger chart is blue: the standard fix for whipsaw on fast charts.']
+  };
+  function howTo() {
+    if (S.sys === 'plan') return '<details class="card how" data-how' + (S.how ? ' open' : '') + '><summary>How to read this</summary><ol>' + [
+      ['The big word', 'BUY NOW, IN TRADE, SELL NOW or WAIT. It is the plan\'s call on the last finished bar.'],
+      ['Exactly where', 'the buy price, the target (sell for a win) and the stop (sell to cap the loss). Set both sell orders when you buy.'],
+      ['The ring', 'the share of this plan\'s whole trades on this coin that made money in the test. CONFIRMED = the same plan, run on all the coins, also made money on the newest prices, which the choice never saw.'],
+      ['Win level and loss risk', 'two separate labels. The win level (WINS 90%+, WINS 80%+, PROFIT FIRST) says how often the plan wins. LOSS RISK (LOW, MEDIUM, HIGH) says how much it can hurt: the worst fall in the test, the average loss, how many wins one loss costs, and how far away the stop is.'],
+      ['STALE, EXPIRED, TOO LATE, INVALID', 'a signal is only NOW while the data is fresh, the next bar has not closed, and the price is still inside the entry zone. Otherwise the big word says why not.'],
+      ['Grey dots', 'signals the plan said NO to, because its trend filter disagreed.'],
+      ['The gold line', 'the plan\'s account on the newest prices. The dashed grey line is just holding the coin.']
+    ].map(function (x) { return '<li><b>' + esc(x[0]) + '</b> ' + esc(x[1]) + '</li>'; }).join('') + '</ol></details>';
+    var steps = [['The big word', 'what your selected layers say on the last finished bar: BUY FLAG, SELL FLAG, STACK BUY, or WAIT.'], ['The ring', 'the tested win ratio of exactly what you selected, on this coin and timeframe. Gold = grade A (90%+, sends phone alerts).']];
+    if (S.sys === 'stack') sel().forEach(function (l) { steps.push(HOW[l]); });
+    if (S.sys === 'stack' && sel().length > 1) steps.push(['Stacking', 'A STACK BUY needs every signal layer to have flagged a buy within a few bars and every trend layer to be blue. It sells on the first sell flag from any signal layer.']);
+    return '<details class="card how" data-how' + (S.how ? ' open' : '') + '><summary>How to read this</summary><ol>' + steps.map(function (x) { return '<li><b>' + esc(x[0]) + '</b> ' + esc(x[1]) + '</li>'; }).join('') + '</ol></details>';
+  }
+  function panelDecision() {
+    var s = '';
+    var ageM = Math.round((Date.now() / 1000 - D.made) / 60);
+    if (!CAN_FETCH || ageM > 20) s += '<div class="note"><b>' + (CAN_FETCH ? 'STALE DATA' : 'SNAPSHOT') + ': ' + (ageM >= 120 ? Math.round(ageM / 60) + ' hours' : ageM + ' minutes') + ' old</b> (made ' + esc(when(D.made)) + '). Anything that says NOW may no longer hold. ' + (CAN_FETCH ? 'The alert program may be stopped: check the PC.' : 'Open the live desk link for the current state.') + ' Phone alerts are always live.</div>';
+    s += sigCard();
+    if (S.sys === 'plan') { var pl = planAt(key()); s += (pl ? planPrices(pl) + planProfit(pl) : '') + levelsCard(); }
+    else if (S.sys === 'stack') s += membersCard() + bestStacksCard();
+    else if (S.sys === 'all') {
+      var q = D.qdss[key()];
+      s += '<div class="card"><h3>The three lights</h3><div style="display:grid;gap:8px"><div class="rowline"><span class="muted small" style="width:30px">Buy</span>' + lightRow('b', q.detail.buy) + '</div><div class="rowline"><span class="muted small" style="width:30px">Sell</span>' + lightRow('s', q.detail.sell) + '</div></div></div>';
+    }
+    return s + howTo() + '<p class="foot">Pretend money only. Test results, not advice. The program never places a trade.</p>';
+  }
+  function planResults() {
+    var p = planAt(key());
+    if (!p) return '<div class="card"><p class="muted">No plan clears the ' + TNAME[S.tier] + ' level on this chart.</p></div>' + levelsCard();
+    var s = '<div class="card"><h3>The ' + TNAME[S.tier] + ' plan</h3><p>' + esc(p.text) + '</p><p class="muted small" style="margin-top:6px">ATR = the average size of one bar\'s move. Every trade is all in, all out, with a 0.40% fee each way. Tested from ' + esc(when(p.from, false)) + '.</p></div>';
+    s += '<div class="card"><table class="st"><thead><tr><th></th><th>Trades</th><th>Won</th></tr></thead><tbody><tr><td>Older prices (the plan was chosen here)</td><td>' + p.on + '</td><td>' + Math.round(p.ow) + '%</td></tr><tr><td>Newest prices, since ' + esc(when(p.split, false)) + '</td><td>' + p.nn + '</td><td>' + (p.nw == null ? '-' : Math.round(p.nw) + '%') + '</td></tr></tbody></table><p style="margin-top:10px">' + (p.ok ? '<span class="pill A">CONFIRMED</span>' : '<span class="pill idle">NOT CONFIRMED</span>') + '</p></div>';
+    var tr = p.tr.slice(-12).reverse();
+    s += '<div class="card"><h3>Its latest trades on this chart</h3>' + (tr.length ? '<div class="list">' + tr.map(function (x) { return '<div class="item"><span class="pill ' + (x[4] > 0 ? 'buy' : 'sell') + '">' + pct(x[4]) + '</span><div class="body"><div class="txt">' + (p.side === 'short' ? 'Shorted ' : 'Bought ') + money(x[1]) + (p.side === 'short' ? ', covered ' : ', sold ') + money(x[3]) + ' (' + WHY[x[5]] + ')</div></div></div>'; }).join('') + '</div>' : '<p class="muted">None in the bars on screen.</p>') + '</div>';
+    return s + planProfit(p);
+  }
+  function panelResults() {
+    var k = key(), ls = sel(), s = '';
+    if (S.sys === 'plan') return planResults();
+    if (S.sys === 'perps') { var c = D.perps[k]; return c.setups.length ? c.setups.map(setupCard).join('') : '<div class="card"><p class="muted">No set-up passed the tests on this chart.</p></div>'; }
+    if (S.sys === 'all') { var q = D.qdss[k]; return '<div class="card"><h3>Latest signals on this chart</h3>' + (q.recent.length ? '<div class="list">' + q.recent.map(function (r) { return '<div class="item"><span class="pill ' + (/BUY/.test(r[0]) ? 'buy' : 'sell') + '">' + esc(r[0]) + '</span><div class="body"><div class="txt">' + esc(when(r[1], false)) + ' at ' + money(r[2]) + '</div></div></div>'; }).join('') + '</div>' : '<p class="muted">None lately.</p>') + '</div>'; }
+    if (ls.length === 1 && ls[0] !== 'htf') {
+      var d = layerAt(ls[0], k), p = d.pick;
+      if (!p) return '<div class="card"><p class="muted">Not tested on this chart yet.</p></div>';
+      s += '<div class="card"><h3>Setting used</h3><p>' + esc(p.text) + '</p><p class="muted small" style="margin-top:6px">' + (p.found ? 'It won 80%+ of its sells on the older 70% of the history (chosen from ' + p.tried + ' settings).' : 'No setting reached 80%; this is the most accurate one tried (' + p.tried + ').') + ' Tested from ' + esc(when(p.from, false)) + ', each flag filled at the next bar\'s open.</p></div>';
+      s += '<div class="card"><div class="kv"><div><b>' + (p.whole.win == null ? '-' : Math.round(p.whole.win) + '%') + '</b><span>win ratio, ' + p.whole.sells + ' sells</span></div><div><b>' + (p.new.win == null ? '-' : Math.round(p.new.win) + '%') + '</b><span>newest prices, ' + p.new.sells + ' sells</span></div><div><b>' + (p.fee && p.fee.win != null ? Math.round(p.fee.win) + '%' : '-') + '</b><span>after fees</span></div><div><b class="' + (p.whole.roi >= 0 ? 'pos' : 'neg') + '">' + pct(p.whole.roi) + '</b><span>ROI (just holding ' + pct(p.hold_roi) + ')</span></div></div><p style="margin-top:10px">' + gradePill(d.ab) + '</p></div>';
+      if (ls[0] === 'atr' && d.top) {
+        var rows = '';
+        for (var kk = 6; kk >= 0; kk--) rows += '<tr' + (kk === d.under ? ' class="here"' : '') + '><td>Level ' + kk + (kk === 6 ? ' (all-time high)' : '') + (kk === d.under ? ' &larr; price is above this' : '') + '</td><td>' + money(d.top * FIB[kk]) + '</td></tr>';
+        s += '<div class="card"><h3>ATR levels now</h3><table class="bt">' + rows + '</table></div>';
+      }
+      return s + bestStacksCard();
+    }
+    var r = (D.C[k] || {})[stackKey()];
+    if (!r) return '<div class="card"><p class="muted">This stack has not been tested on this chart. Stacks need at least one signal layer (ATR, Mean Reversion or Confluence).</p></div>' + bestStacksCard();
+    s += '<div class="card"><h3>' + esc(ls.map(function (l) { return LNAME[l]; }).join(' + ')) + '</h3><div class="kv"><div><b>' + Math.round(r.win) + '%</b><span>win ratio, ' + r.ws + ' sells</span></div><div><b>' + (r.nw == null ? '-' : Math.round(r.nw) + '%') + '</b><span>newest prices, ' + r.ns + ' sells</span></div><div><b>' + (r.fw == null ? '-' : Math.round(r.fw) + '% / ' + (r.fnw == null ? '-' : Math.round(r.fnw) + '%')) + '</b><span>after fees (whole / newest)</span></div><div><b class="' + (r.roi >= 0 ? 'pos' : 'neg') + '">' + pct(r.roi) + '</b><span>ROI after fees (holding ' + pct(r.hold) + ')</span></div></div><p style="margin-top:10px">' + gradePill(r.g) + ' <span class="muted small">Agreement window ' + r.w + ' bars, ' + esc(r.sz) + '. Tested from ' + esc(when(r.from, false)) + '; newest prices from ' + esc(when(r.split, false)) + '.</span></p></div>';
+    return s + bestStacksCard();
+  }
+  function panelNow() {
+    var fresh = [], open = [];
+    Object.keys(D.L.atr || {}).forEach(function (k) {
+      OVER.forEach(function (l) { if (l === 'htf') return; var d = layerAt(l, k); if (d && d.fresh && d.ab === 'A') fresh.push([LNAME[l], d.fresh, k, [l], 'grade A, ' + winOf(d) + '%']); });
+      var all = D.C[k] || {};
+      Object.keys(all).forEach(function (sk) { var r = all[sk]; if (r.g !== 'A') return; var ls = sk.split('+'), cmb = combine(ls, k, r.w); if (!cmb) return; var n = cmb.n;
+        if (cmb.buys.indexOf(n - 1) >= 0) fresh.push(['STACK', 'BUY', k, ls, 'grade A, ' + Math.round(r.win) + '%']); else if (cmb.sells.indexOf(n - 1) >= 0) fresh.push(['STACK', 'SELL', k, ls, 'grade A, ' + Math.round(r.win) + '%']); });
+    });
+    Object.keys(D.perps || {}).forEach(function (k) { var c = D.perps[k]; c.setups.forEach(function (x) { if (x.state !== 'waiting') open.push([c, x]); }); });
+    var pe = [], po = [];
+    Object.keys(D.P).forEach(function (k) { BOOKS.forEach(function (b) { TIERS.forEach(function (t) { var p = (D.P[k][b] || {})[t]; if (!p || !p.ok) return; if (p.fresh) pe.push([k, t, p, b]); else if (p.open) po.push([k, t, p, b]); }); }); });
+    function prow(x) { var k = x[0].split('|'), p = x[2], sh = p.side === 'short', IN = p.fresh === 'IN', OUT = p.fresh === 'OUT';
+      var txt = IN ? (sh ? 'Sell short near ' : 'Buy near ') + money(p.next.buy) + (p.next.target ? ', target ' + money(p.next.target) : '') + (p.next.stop ? ', stop ' + money(p.next.stop) : '')
+        : OUT ? (sh ? 'Buy back near ' : 'Sell near ') + money(p.sold.price) + ': ' + WHY[p.sold.why] + ' (' + pct(p.sold.pct) + ')'
+        : (sh ? 'Shorted ' : 'Bought ') + money(p.open.entry) + ', now ' + pct(p.open.pct) + (p.open.target ? ', target ' + money(p.open.target) : '') + (p.open.stop ? ', stop ' + money(p.open.stop) : '');
+      var word = IN ? (sh ? 'SHORT' : 'BUY') : OUT ? (sh ? 'COVER' : 'SELL') : 'HOLD', green = IN ? !sh : OUT ? sh : !sh;
+      return '<button class="item" data-plan="' + esc(x[0] + '|' + x[3] + '|' + x[1]) + '"><span class="pill ' + (green ? 'buy' : 'sell') + '">' + word + '</span><div class="body"><div class="ttl">' + esc(k[0] + ' ' + TFN[k[1]]) + ' &middot; ' + BSHORT[x[3]] + ' &middot; ' + TNAME[x[1]] + '</div><div class="txt">' + esc(txt) + '</div></div></button>'; }
+    var s0 = '<div class="card"><h3>Trade plans: buy or sell now</h3>' + (pe.length ? '<div class="list">' + pe.map(prow).join('') + '</div>' : '<p class="muted">Nothing to do right now on any confirmed plan.</p>') + '</div>'
+      + '<div class="card"><h3>Trade plans: trades open</h3>' + (po.length ? '<div class="list">' + po.map(prow).join('') + '</div>' : '<p class="muted">No confirmed plan is in a trade.</p>') + '</div>';
+    var s = s0 + '<div class="card"><h3>Grade A signals on the last finished bar</h3>' + (fresh.length ? '<div class="list">' + fresh.map(function (f) { return '<button class="item" data-go="' + esc(f[2] + '|' + f[3].join('+')) + '"><span class="pill ' + (f[1] === 'BUY' ? 'buy' : 'sell') + '">' + esc(f[0]) + ' ' + f[1] + '</span><div class="body"><div class="ttl">' + esc(f[2].split('|')[0] + ' ' + TFN[f[2].split('|')[1]]) + '</div><div class="txt">' + esc(f[3].map(function (l) { return LNAME[l]; }).join(' + ')) + ' &middot; ' + f[4] + '</div></div></button>'; }).join('') + '</div>' : '<p class="muted">None right now. Every grade A layer and stack is waiting.</p>') + '</div>';
+    s += '<div class="card"><h3>PERP trades open or called</h3>' + (open.length ? '<div class="list">' + open.map(function (p) { var c = p[0], x = p[1]; return '<button class="item" data-pick="perps|' + esc(c.name + '|' + c.tf) + '"><span class="pill ' + (x.side === 'long' ? 'buy' : 'sell') + '">' + x.lev + 'x ' + x.side.toUpperCase() + '</span><div class="body"><div class="ttl">' + esc(c.name + ' ' + c.tfName) + '</div></div></button>'; }).join('') + '</div>' : '<p class="muted">None. Every set-up is waiting.</p>') + '</div>';
+    return s;
+  }
+  function panelAlerts() {
+    var labs = ['all']; D.alerts.forEach(function (a) { var l = alabel(a); if (labs.indexOf(l) < 0) labs.push(l); });
+    if (labs.indexOf(S.af) < 0) S.af = 'all';
+    var list = D.alerts.slice().reverse().filter(function (a) { return S.af === 'all' || alabel(a) === S.af; });
+    return '<div class="chips" role="group" aria-label="Filter alerts">' + labs.map(function (f) { return '<button class="chip" data-af="' + esc(f) + '" aria-pressed="' + (S.af === f) + '">' + (f === 'all' ? 'All' : esc(f)) + '</button>'; }).join('') + '</div><p class="muted small">' + (feedOn ? 'Arriving live.' : CAN_FETCH ? 'Connecting.' : 'As of the snapshot.') + '</p>' +
+      '<div class="card">' + (list.length ? '<div class="list">' + list.map(alertItem).join('') + '</div>' : '<p class="muted">No alerts of this kind have been sent yet.</p>') + '</div>';
+  }
+  function panelBoard() {
+    var sys = S.sys, tfs = TFS.filter(function (tf) { return Object.keys(LD(sys)).some(function (k) { return k.split('|')[1] === tf; }); });
+    var what = sys === 'stack' ? sel().map(function (l) { return LNAME[l]; }).join(' + ') : sys === 'plan' ? 'the ' + BNAME[S.book] + ' ' + TNAME[S.tier] + ' plans' : LNAME[sys];
+    var h = '<p class="muted small">Every chart for ' + esc(what) + '. Tap a square to open it.</p><div class="card"><div class="grid-scroll"><table class="grid"><thead><tr><th></th>' + tfs.map(function (tf) { return '<th scope="col">' + TFL[tf] + '</th>'; }).join('') + '</tr></thead><tbody>';
+    names(sys).forEach(function (nm) { h += '<tr><th class="rowhead" scope="row">' + esc(nm) + '</th>' + tfs.map(function (tf) { return '<td>' + sqBtn(sys, nm, tf, nm === S.name && tf === S.tf) + '</td>'; }).join('') + '</tr>'; });
+    h += '</tbody></table></div></div>';
+    if (sys === 'plan' && D.PS) {
+      h += '<div class="card"><h3>' + BNAME[S.book] + ': every timeframe at the ' + TNAME[S.tier] + ' level: newest prices, $10,000 split across the coins</h3><table class="st"><thead><tr><th>Chart</th><th>Test</th><th>Coins up</th><th>Won</th><th>$10,000 became</th><th>Holding</th><th>Worst fall</th></tr></thead><tbody>';
+      TFS.forEach(function (tf) { var r = ((D.PS[S.book] || {})[tf] || {})[S.tier]; if (!r) return;
+        h += '<tr><td>' + TFN[tf] + '</td>' + (r.amt == null ? '<td colspan="6" style="text-align:left;font:500 12px var(--body);color:var(--muted)">no plan clears this level</td>' : '<td>' + (r.ok ? '<span class="pill A">PASS</span>' : '<span class="pill idle">FAIL</span>') + '</td><td>' + r.up + ' of ' + r.n + '</td><td>' + r.win + '%</td><td class="' + (r.ret >= 0 ? 'pos' : 'neg') + '">' + dollars(r.amt) + '</td><td>' + pct0(r.hold) + '</td><td>' + r.dd + '%</td>') + '</tr>'; });
+      h += '</tbody></table><p class="muted small" style="margin-top:8px">One plan per timeframe, chosen on the older prices of all the coins together, then run on prices it never saw. To pass, the basket must make money AND most of its coins must make money. FAIL rows send no alerts. The same percentages apply to $1,000 and $100,000.</p></div>';
+      if (S.book !== 'spot') { var lv2 = ''; TFS.forEach(function (tf) { var r = ((D.PS[S.book] || {})[tf] || {})[S.tier]; if (!r || !r.ok || !r.lev) return;
+        lv2 += '<tr><td>' + TFN[tf] + '</td>' + ['1', '2', '3', '5', '10'].map(function (L) { var v = r.lev[L]; return '<td class="' + (!v || v[0] < 0 ? 'neg' : 'pos') + '">' + (v ? pct0(v[0]) + '<br><span class="muted" style="font:500 11px var(--body)">fall ' + v[1] + '%</span>' : 'WIPED OUT') + '</td>'; }).join('') + '</tr>'; });
+        h += '<div class="card"><h3>What leverage does to the confirmed ' + BNAME[S.book] + ' plans</h3>' + (lv2 ? '<table class="st"><thead><tr><th>Chart</th><th>1x</th><th>2x</th><th>3x</th><th>5x</th><th>10x</th></tr></thead><tbody>' + lv2 + '</tbody></table>' : '<p class="muted">No confirmed plan at this level.</p>') + '<p class="muted small" style="margin-top:8px">Leverage multiplies every gain and every loss. Pick it from the stop: the share of the account you accept to lose on one trade, divided by the stop distance.</p></div>'; }
+    }
+    return h + '<p class="muted small">' + (sys === 'plan' ? 'Solid green B: buy now. Solid red S: sell now. Green dot: in a trade. Gold number: a confirmed plan waiting, with its win %. Dashed: no confirmed plan.' : sys === 'stack' ? 'Gold number = grade A win ratio (sends alerts). Green = grade B. Solid green B or red S = a flag on the last bar. Dashed = below 80% after fees.' : sys === 'perps' ? 'Green L: long open. Red S: short open. Outlined: just called. Dashed: no set-up passes.' : 'Solid 3: ALL BUY or ALL SELL. Outlined 2: get ready.') + '</p>';
+  }
+  function panelGuide() {
+    var rows = [
+      ['Trade plans', 'A plan is one whole trade at a time: all in at the buy, all out at the target, the stop or the sell signal. Each alert gives the buy price, the target and the stop. There is one plan per timeframe and risk level, chosen on the older 70% of the history of all the coins together. It is CONFIRMED only if the whole basket of coins made money on the newest 30%, which the choice never saw. Only confirmed plans send alerts.'],
+      ['Three books', 'SPOT buys the coin itself on Kraken: long only, no leverage, 0.40% fee each way. PERP LONG and PERP SHORT are perpetual futures: fees are about ten times lower, you pay or receive funding, you can profit when the price falls, and you can use leverage. Each book has its own plans and its own test.'],
+      ['Leverage', 'Leverage multiplies every gain and every loss. The professional rule: choose it from the stop. Leverage = the share of the account you accept to lose on one trade, divided by the stop distance. Risking 2% with a stop 4% away is 0.5x, not 10x. Each perp alert does this sum for you, and the Board tab shows what 2x to 10x would have done to each confirmed plan.'],
+      ['No repainting', 'Every signal here is read on a CLOSED bar and filled at the next bar\u2019s open, with fees, funding and a worst-case rule when a stop and a target sit in the same bar. Many popular chart scripts look better than they trade because they repaint, fill at prices that never existed, or ignore fees.'],
+      ['Win level is not risk', 'WINS 90%+ and WINS 80%+ say how often a plan won in the test. They get there with close targets and far stops, so one loss can cost several wins. PROFIT FIRST lets winners run and wins less often. How much a plan can hurt is the separate LOSS RISK label: LOW, MEDIUM or HIGH, from the worst fall, the average loss, how many wins one loss costs and the stop distance.'],
+      ['PASSED BACKTEST is not proof', 'It means: one plan per timeframe, chosen on older prices across all coins, made money on newer prices it had not seen, on most coins. That test has been reused, and a pass can be luck. The Learning tab tracks each plan\u2019s forward record from 15 Nov 2026; that is the evidence that counts.'],
+      ['Learning tab', 'What the system has learned from its own records: each strategy\u2019s stated win rate against what has happened since, candidates being tested in shadow (never sent), decisions to keep or change a rule with the evidence behind them, delays, data gaps, and when the next learning cycle runs. No live rule changes without your approval.'],
+      ['Why fast charts have no plan', 'A whole trade pays 0.80% in fees (0.40% in, 0.40% out). On 15-minute and 1-hour charts the moves are too small to clear that, so no plan passed even on the older prices.'],
+      ['Where the plans come from', 'Entries: this desk\'s layers, plus published rules from well-known traders: the Turtle traders\' breakouts, Larry Connors\' RSI-2 dip, Linda Raschke\'s pullback in a strong trend. Exits: fixed targets and stops in ATRs, Chuck LeBeau\'s trailing stop, and the channel-middle stop from a 2025 crypto trend study. Filters: the 200-bar average (Paul Tudor Jones\' rule) and the bigger chart\'s trend.'],
+      ['Win ratio is not profit', 'A plan can win 90% of the time and still lose money if one loss is bigger than nine wins. Always read the profit, the worst fall and the average win and loss beside the win ratio.'],
+      ['Layers you can stack', 'Tap ATR, MEAN REV, OPT TREND, TREND, CONFLUENCE and BIG TREND at the top to switch each on or off. One layer shows its own flags; two or more show STACK flags where they all agree. ALL THREE and PERPS are separate systems.'],
+      ['Grades', 'A = 90%+ of sells won over the whole history, on the newest prices (never seen when the settings were chosen), and both again after a 0.40% fee per trade. Only grade A sends phone alerts. B = the same at 80%+.'],
+      ['Optimized Trend', 'His ribbon: a fast and a slow average with the space between them filled, blue while the fast one is above, orange below. The two lengths are tuned for each coin and timeframe on risk-adjusted return (Sharpe). It is a stay-in filter, not a win-ratio tool.'],
+      ['Mean Reversion', 'One line in its own pane: standard deviations from the mean. Red zone = stretched high, green zone = stretched low. Dots fire when it turns back out of a zone.'],
+      ['ATR', 'Seven purple levels from the all-time high down, a blue / orange trend cloud, buy and sell flags. His guide: built for the daily chart, also 12-hour and 8-hour, not for scalping.'],
+      ['Big trend', 'The next timeframe up\'s ribbon. On 15-minute and 1-hour charts it is the 4-hour; on 4-hour to 12-hour charts the daily.'],
+      ['Why fast charts rarely grade', 'On 15-minute charts the wins are small, so a 0.40% fee per trade turns many of them into losses. Grades there are rare; stack with the big trend, or move up a timeframe.'],
+      ['Win ratio', 'Counted like his backtest table: the share of sells that brought in more than those coins cost. Coins still held at a loss are not in it.']
+    ];
+    return '<div class="card"><dl>' + rows.map(function (r) { return '<div><dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd></div>'; }).join('') + '</dl></div>';
+  }
+  function ago(x) { if (!x) return 'never'; var m = Math.round((Date.now() / 1000 - x) / 60); return m < 0 ? 'in ' + (-m >= 120 ? Math.round(-m / 60) + ' h' : -m + ' min') : m >= 2880 ? Math.round(m / 1440) + ' days ago' : m >= 120 ? Math.round(m / 60) + ' h ago' : m + ' min ago'; }
+  function pc1(x) { return x == null ? '-' : Math.round(x * 100) + '%'; }
+  function panelLearn() {
+    var L = D.LS;
+    if (!L) return '<div class="card"><p class="muted">The first learning cycle has not run yet. It starts by itself within the hour while the alert program is running.</p></div>';
+    var late = Date.now() / 1000 - (L.last_ok || 0) > 3 * 3600, s = '';
+    s += '<div class="card"><h3>Learning cycle</h3><div class="kv"><div><b class="' + (L.ok && !late ? 'pos' : 'neg') + '">' + (L.ok ? ago(L.last_ok) : 'FAILED') + '</b><span>last successful cycle (' + esc(L.mode) + ', no. ' + L.cycle + ')</span></div><div><b>' + ago(L.next_light) + '</b><span>next hourly cycle</span></div><div><b>' + ago(L.next_deep) + '</b><span>next weekly deep cycle</span></div><div><b>' + L.secs + ' s</b><span>took (CPU ' + L.cpu_secs + ' s, memory ' + L.peak_mb + ' MB)</span></div><div><b class="' + ((L.failures || []).length ? 'neg' : 'pos') + '">' + (L.failures || []).length + '</b><span>failed steps on record</span></div><div><b>' + L.ledger.alerts + '</b><span>alerts in the ledger (' + L.ledger.shadow + ' shadow, ' + L.ledger.outcomes + ' outcomes)</span></div></div>'
+      + (late ? '<p class="note" style="margin-top:10px">No cycle for over 3 hours. The alert program starts it: is the PC on and logged in?</p>' : '') + ((L.failures || []).length ? '<p class="muted small" style="margin-top:8px">Last failure: ' + esc(L.failures[L.failures.length - 1].step + ': ' + L.failures[L.failures.length - 1].error) + '</p>' : '')
+      + '<p class="muted small" style="margin-top:8px">Runs by itself every hour (light) and every week (deep) while the PC is on and logged in. It needs no chat open. It never changes a live rule: it proposes, you decide. Rules version ' + esc(L.ledger.version) + '; ' + L.ledger.snapshots + ' Hyperliquid snapshots saved.</p></div>';
+    var PZ = D.PZ || { plans: [], log: [], rules: {} }, held = PZ.plans.filter(function (x) { return x.state === 'PAUSED' || x.state === 'ELIGIBLE TO RESUME'; });
+    s += '<div class="card"><h3>Paused plans (new entries only)</h3>' + (held.length ? '<div class="list">' + held.map(function (x) { var e = x.evidence || {}, sh = x.shadow || {}; return '<div class="item"><span class="pill ' + (x.state === 'PAUSED' ? 'sell' : 'A') + '">' + esc(x.state) + '</span><div class="body"><div class="ttl">' + esc(x.name) + '</div><div class="txt">Paused ' + ago(x.at) + ' (' + esc(x.by || '') + ') because ' + esc(x.reason || '') + '. Evidence: ' + (e.wins == null ? '-' : e.wins + ' wins in ' + e.trades + ' forward trades, ' + e.clusters + ' separate market events, result ' + e.forward_result + '%, fall ' + e.forward_fall + '% (limit ' + e.fall_limit + '%)') + '. In shadow since: ' + (sh.shadow_trades || 0) + ' trades, ' + (sh.shadow_clusters || 0) + ' events, evidence ' + (sh.evidence_now || 0) + ' of ' + (sh.threshold || PZ.rules.threshold) + '. Exits and risk notices for earlier trades continue. To resume: <code>py pause.py resume "' + esc(x.key) + '"</code></div></div></div>'; }).join('') + '</div>' : '<p class="muted">None. Every passed plan is sending its entry alerts.</p>')
+      + '<details style="margin-top:10px"><summary>Every plan against the pause rules</summary><table class="st" style="margin-top:8px"><thead><tr><th>Plan</th><th>State</th><th>Forward trades</th><th>Events</th><th>Evidence</th><th>Fall</th></tr></thead><tbody>' + PZ.plans.map(function (x) { var e = x.evidence || {}; return '<tr><td>' + esc(x.name) + '</td><td class="' + (x.state === 'ACTIVE' || x.state === 'RESUMED' ? 'pos' : 'neg') + '" style="font:600 11px var(--body)">' + esc(x.state) + '</td><td>' + (e.wins == null ? '-' : e.wins + ' of ' + e.trades) + '</td><td>' + (e.clusters == null ? '-' : e.clusters + ' of ' + PZ.rules.min_clusters + ' needed') + '</td><td>' + (e.evidence_now == null ? '-' : e.evidence_now + ' of ' + PZ.rules.threshold) + '</td><td>' + (e.forward_fall == null ? '-' : e.forward_fall + '% of ' + e.fall_limit + '%') + '</td></tr>'; }).join('') + '</tbody></table><p>A plan is paused when its forward results are too poor to be bad luck AND it is losing money, or when its forward basket falls more than 1.5 times the worst fall in its test. Trades closing in the same bar count as one event. Needs ' + PZ.rules.min_clusters + ' events and ' + PZ.rules.min_trades + ' trades. Missing or late data holds entries without pausing the plan. A paused plan never resumes by itself.</p>'
+      + ((PZ.log || []).length ? '<p><b>Audit trail:</b> ' + PZ.log.map(function (g) { return esc(when(g.t)) + ' ' + esc(g.event) + ' ' + esc(g.plan); }).join('; ') + '.</p>' : '<p><b>Audit trail:</b> no pause has happened yet.</p>') + '</details></div>';
+    var props = L.proposals || [];
+    s += '<div class="card"><h3>Waiting for your decision</h3>' + (props.length ? '<div class="list">' + props.map(function (x) { return '<div class="item"><span class="pill A">' + esc(x.id || '') + '</span><div class="body"><div class="ttl">' + esc(x.name) + '</div><div class="txt">' + esc(x.status || '') + '</div></div></div>'; }).join('') + '</div>' : '<p class="muted">Nothing. No candidate has earned a change yet, and no live strategy has done badly enough to pull.</p>') + '</div>';
+    var ch = L.changes || [];
+    s += '<div class="card"><h3>What new evidence changed in the last cycle</h3>' + (ch.length ? '<div class="list">' + ch.map(function (c) { return '<div class="item"><div class="body"><div class="ttl">' + esc(c.unit) + '</div><div class="txt">Stated ' + pc1(c.stated_rate) + '. Then ' + c.after.wins + ' of ' + c.after.n + ' forward results went its way, so the working estimate moved from ' + pc1(c.before.rate) + ' to <b>' + pc1(c.after.rate) + '</b>. State: ' + esc(c.after.state) + '. Evidence: ' + esc(c.evidence) + '.</div></div></div>'; }).join('') + '</div>' : '<p class="muted">No new outcomes since the cycle before.</p>') + '</div>';
+    s += '<div class="card"><h3>Every strategy: stated rate against what has happened since</h3><div class="grid-scroll"><table class="st"><thead><tr><th>Strategy</th><th>Stated</th><th>Forward</th><th>Now</th><th>State</th></tr></thead><tbody>' + (L.units || []).map(function (u) { return '<tr><td>' + esc(u.name) + '<br><span class="muted" style="font:500 11px var(--body)">' + esc(u.kind) + '</span></td><td>' + pc1(u.prior) + '</td><td>' + u.wins + ' of ' + u.n + (u.pending ? ' (+' + u.pending + ' open)' : '') + '</td><td>' + pc1(u.post) + '</td><td class="' + (u.state === 'NORMAL' ? 'pos' : u.state === 'NO FORWARD EVIDENCE' ? '' : 'neg') + '" style="font:600 11px var(--body)">' + esc(u.state) + '</td></tr>'; }).join('') + '</tbody></table></div><p class="muted small" style="margin-top:8px">Stated = the rate from the test. Now = the test counted as 20 results, plus every forward result. REDUCED or WITHHOLD PROPOSED appears when the forward record is too poor to be bad luck.</p></div>';
+    s += '<div class="card"><h3>Candidates (tested beside the live rules, never sent)</h3><div class="list">' + (L.candidates || []).map(function (c) { var good = /QUALIFIES/.test(c.status), bad = /REJECTED|FAILED/.test(c.status); return '<div class="item"><span class="pill ' + (good ? 'A' : bad ? 'idle' : 'line') + '">' + esc(c.id) + '</span><div class="body"><div class="ttl">' + esc(c.name) + '</div><div class="txt"><b>' + esc(c.status) + '.</b> ' + esc(c.decision) + ' Rule set in advance: ' + esc(c.rule) + ' Evidence: ' + esc(c.evidence) + ' (' + esc(c.have) + ').</div></div></div>'; }).join('') + '</div></div>';
+    var RS = L.research || {}, rw = RS.worker || {};
+    s += '<div class="card"><h3>Research worker (runs by itself, weekly)</h3><div class="kv"><div><b class="' + (RS.state === 'OK' || RS.state === 'RUNNING' ? 'pos' : RS.state === 'NEVER RUN' ? '' : 'neg') + '">' + esc(RS.state || 'unknown') + '</b><span>state</span></div><div><b>' + ago(RS.last) + '</b><span>last run</span></div><div><b>' + (rw.minutes == null ? '-' : rw.minutes + ' min') + '</b><span>took' + (rw.lookups == null ? '' : ', ' + rw.lookups + ' lookups') + '</span></div></div>'
+      + (rw.experiment ? '<p class="why" style="margin-top:8px"><b>' + esc(rw.experiment) + ' ' + esc(rw.title || '') + ':</b> ' + esc(rw.verdict || '') + '. ' + esc(rw.summary || '') + '</p>' : '<p class="muted" style="margin-top:8px">No finished run yet. ' + esc(RS.schedule || '') + '.</p>')
+      + (rw.error ? '<p class="note" style="margin-top:8px">' + esc(rw.error) + '</p>' : '')
+      + '<p class="muted small" style="margin-top:8px">It reads the standing instructions, takes the next experiment from the queue, looks for new evidence, writes the hypothesis down before testing, runs one experiment, and saves what it found in research/findings. It cannot change a live rule. It needs the Claude desktop app open on this PC; its first run may ask for tool permission.</p>'
+      + '<table class="st" style="margin-top:8px"><thead><tr><th>Queue</th><th>State</th></tr></thead><tbody>' + (RS.queue || []).map(function (q) { return '<tr><td>' + esc(q.id + ' ' + q.title) + (q.waiting_for ? '<br><span class="muted" style="font:500 11px var(--body)">waits for ' + esc(q.waiting_for) + '</span>' : '') + (q.result ? '<br><span class="muted" style="font:500 11px var(--body)">' + esc(q.result) + '</span>' : '') + '</td><td style="font:600 11px var(--body)">' + esc(q.status) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    var TR = L.trades || {};
+    s += '<div class="card"><h3>Your actual trades</h3><p class="why">' + (TR.fills ? TR.fills + ' fills imported. Run <code>py trades_import.py report</code> for actual against paper by plan, with delay and slippage.' : 'None imported yet, so every result here is a paper result from an alert.') + '</p><p class="muted small" style="margin-top:6px">Export your history from Kraken (or fill in trades/journal_template.csv), put the file in the trades folder and run <code>py trades_import.py import &lt;file&gt;</code>. Each fill is matched to the alert that came before it. Steps in trades/README.md. The importer has only been tested on made-up files so far: run the first real import with --check.</p></div>';
+    var VF = (L.versions || {}).findings || [];
+    if (VF.length) s += '<div class="card"><h3>The older weekly self-tuning, checked against what it replaced</h3><ul style="margin:0;padding-left:18px;display:grid;gap:6px;font-size:13px;color:var(--muted)">' + VF.map(function (f) { return '<li>' + esc((typeof f === 'string' ? f : (f.finding || f.title || JSON.stringify(f))).replace(/[*`]/g, '')) + '</li>'; }).join('') + '</ul><p class="muted small" style="margin-top:8px">Full tables: research/VERSION_COMPARISON.md. Verdict under the rule set in advance: not enough changes to judge, leaning against. Learned settings are not applied to alerts.</p></div>';
+    var wk = L.weak || {}, lm = wk.lag_minutes || {};
+    s += '<div class="card"><h3>Weaknesses found</h3>' + ((wk.items || []).length ? '<ul style="margin:0;padding-left:18px;display:grid;gap:6px">' + wk.items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '<p class="muted">None on record yet.</p>')
+      + (Object.keys(lm).length ? '<table class="st" style="margin-top:10px"><thead><tr><th>Bar close to phone</th><th>Alerts</th><th>Median</th><th>Worst</th></tr></thead><tbody>' + TFS.filter(function (tf) { return lm[tf]; }).map(function (tf) { return '<tr><td>' + TFN[tf] + '</td><td>' + lm[tf].n + '</td><td>' + lm[tf].median + ' min</td><td>' + lm[tf].worst + ' min</td></tr>'; }).join('') + '</tbody></table>' : '') + '</div>';
+    var ex = L.experience || {};
+    s += '<div class="card"><h3>Is the market inside what the tests covered?</h3><p class="why">' + esc(ex.note || 'Not checked.') + '</p>' + (ex.vol_30d != null ? '<p class="muted small" style="margin-top:6px">Bitcoin 30-day volatility ' + ex.vol_30d + '% a year (higher than ' + ex.vol_pct + '% of the last four years). Bitcoin is ' + ex.dist_200d + '% from its 200-day average (lower than ' + (100 - ex.dist_pct) + '% of days).</p>' : '') + '</div>';
+    var sc = L.scenarios;
+    if (sc && sc.plans) {
+      var cf = (sc.checks || []).filter(function (c) { return !c.ok; }).length;
+      s += '<div class="card"><h3>What-if tests on the plans that passed</h3><div class="grid-scroll"><table class="st"><thead><tr><th>Plan</th><th>As tested</th><th>Fills cost 3x</th><th>Fills cost 10x</th><th>Funding against</th><th>One bar late</th></tr></thead><tbody>' + Object.keys(sc.plans).map(function (k) { var r = sc.plans[k].sims, c = function (x) { return '<td class="' + (x.ret >= 0 ? 'pos' : 'neg') + '">' + pct0(x.ret) + '</td>'; }; return '<tr><td>' + esc(sc.plans[k].plan.replace('SAFE', TNAME.safe).replace('BALANCED', TNAME.balanced).replace('GROWTH', TNAME.growth)) + '</td>' + c(r.base) + c(r.cost3) + c(r.cost10) + c(r.fund) + c(r.late) + '</tr>'; }).join('') + '</tbody></table></div><p class="muted small" style="margin-top:8px">Basket return on the newest prices at 1x. "As tested" and "one bar late" replay real prices; the others are simulations with one assumption changed. Rule checks (stale data, thin book, price past the entry zone, liquidation maths): ' + ((sc.checks || []).length - cf) + ' of ' + (sc.checks || []).length + ' pass. Run ' + ago(sc.made) + '.</p></div>';
+    }
+    s += '<div class="card"><h3>Experiments</h3><div class="list">' + (L.experiments || []).map(function (e) { var ok = /PASSED/.test(e.status), nx = /NEXT|WAITING/.test(e.status); return '<div class="item"><span class="pill ' + (ok ? 'A' : nx ? 'line' : 'idle') + '">' + esc(e.id) + '</span><div class="body"><div class="ttl">' + esc(e.name) + ' <span class="muted" style="font-weight:500">' + esc(e.status) + '</span></div><div class="txt">' + esc(e.result) + ' Evidence: ' + esc(e.evidence) + '.</div></div></div>'; }).join('') + '</div></div>';
+    s += '<div class="card"><h3>Data gaps and limits</h3><ul style="margin:0;padding-left:18px;display:grid;gap:6px;color:var(--muted);font-size:13px"><li>Two days of forward records. Most conclusions still rest on replayed history.</li><li>No record of trades you actually placed. Every forward result is a paper result from an alert.</li><li>No perp open-interest history is reachable from the US; it is being saved every run from 15 Nov 2026.</li><li>No price history is untouched for the 15 project coins; new ideas are judged on 10 other coins and on the forward log.</li><li>No alert shows a probability: none has been verified on unseen data.</li></ul></div>';
+    return s;
+  }
+  var PTABS = [['decision', 'Signal'], ['setups', 'Results'], ['now', 'Now'], ['alerts', 'Alerts'], ['board', 'Board'], ['learn', 'Learning'], ['guide', 'Guide']];
+  function renderPanel() {
+    $('ptabs').innerHTML = PTABS.map(function (t) { return '<button role="tab" data-ptab="' + t[0] + '" aria-selected="' + (S.ptab === t[0]) + '">' + (t[0] === 'setups' && S.sys === 'perps' ? 'Set-ups' : t[1]) + (t[0] === 'alerts' && unread ? '<span class="badge">' + unread + '</span>' : '') + '</button>'; }).join('');
+    $('pbody').innerHTML = S.ptab === 'learn' ? panelLearn() : S.ptab === 'setups' ? panelResults() : S.ptab === 'now' ? panelNow() : S.ptab === 'alerts' ? panelAlerts() : S.ptab === 'board' ? panelBoard() : S.ptab === 'guide' ? panelGuide() : panelDecision();
+    requestAnimationFrame(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.ring .fg'), function (el) { el.style.strokeDashoffset = el.getAttribute('data-to'); });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-count]'), function (el) {
+        var to = parseInt(el.getAttribute('data-count'), 10), t0 = null;
+        if (isNaN(to)) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = to; return; }
+        function step(ts) { if (t0 == null) t0 = ts; var kk = Math.min(1, (ts - t0) / 900); el.textContent = Math.round(to * (1 - Math.pow(1 - kk, 3))); if (kk < 1) requestAnimationFrame(step); }
+        requestAnimationFrame(step);
+      });
+    });
+  }
+  function renderAll() {
+    fix(); renderTop(); renderWatch(); renderToolbar(); renderPanel(); mount(); save();
+    document.documentElement.style.setProperty('--topH', $('top').offsetHeight + 'px');
+  }
+  document.addEventListener('toggle', function (e) { if (e.target.matches && e.target.matches('[data-how]')) { S.how = e.target.open; save(); } }, true);
+
+  // ── clicks ───────────────────────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-book],[data-tier],[data-plan],[data-toggle],[data-sys],[data-coin],[data-pick],[data-tf],[data-fit],[data-ptab],[data-af],[data-stack],[data-go]');
+    if (!el) return;
+    var d = el.dataset;
+    if (d.book) { S.book = d.book; S.sys = 'plan'; renderAll(); }
+    else if (d.tier) { S.tier = d.tier; S.sys = 'plan'; renderAll(); }
+    else if (d.plan) { var pk = d.plan.split('|'); S.book = pk[2]; S.tier = pk[3]; S.ptab = 'decision'; pick('plan', pk[0], pk[1]); if (window.innerWidth < 1024) window.scrollTo(0, 0); }
+    else if (d.toggle) {
+      if (S.sys !== 'stack') { S.sys = 'stack'; S.sel = [d.toggle]; }
+      else { var i = S.sel.indexOf(d.toggle); if (i >= 0) { if (sel().length > 1) S.sel.splice(i, 1); } else S.sel.push(d.toggle); }
+      renderAll();
+    }
+    else if (d.sys) pick(d.sys, null, null);
+    else if (d.stack) { S.sys = 'stack'; S.sel = d.stack.split('+'); renderAll(); }
+    else if (d.go) { var g = d.go.split('|'); S.sel = g[2].split('+'); S.ptab = 'decision'; pick('stack', g[0], g[1]); if (window.innerWidth < 1024) window.scrollTo(0, 0); }
+    else if (d.coin) pick(null, d.coin, null);
+    else if (d.pick) { var p = d.pick.split('|'); S.ptab = 'decision'; pick(p[0], p[1], p[2]); if (window.innerWidth < 1024) window.scrollTo(0, 0); }
+    else if (d.tf) pick(null, null, d.tf);
+    else if (d.fit) { try { sessionStorage.removeItem('qdss-range'); } catch (err) {} if (lw) lw.chart.timeScale().setVisibleLogicalRange({ from: lw.n - lw.show, to: lw.n + 5 }); }
+    else if (d.ptab) { S.ptab = d.ptab; if (d.ptab === 'alerts') { unread = 0; document.title = 'QDSS Desk'; } renderPanel(); save(); }
+    else if (d.af) { S.af = d.af; renderPanel(); save(); }
+  });
+
+  // ── alerts arrive on the page the moment the program sends them ──────────
+  function toast(a) {
+    var t = document.createElement('div');
+    t.className = 'toast'; t.setAttribute('role', 'status');
+    t.innerHTML = esc(a.title) + '<small>' + esc(a.body.slice(0, 150)) + '</small>';
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 12000);
+  }
+  var es = null;
+  function startFeed() {
+    var f = LOCAL || (D && D.feed);
+    if (!CAN_FETCH || !f || !f.topic || !window.EventSource || es) return;
+    es = new EventSource(f.server.replace(/\/$/, '') + '/' + f.topic + '/sse');
+    es.onopen = function () { feedOn = true; paintStatus(); if (S.ptab === 'alerts') renderPanel(); };
+    es.onerror = function () { feedOn = false; paintStatus(); };
+    es.onmessage = function (e) {
+      try {
+        var m = JSON.parse(e.data);
+        if (m.event && m.event !== 'message') return;
+        var a = { t: m.time, title: m.title || 'QDSS', body: m.message || '' };
+        if (D.alerts.some(function (x) { return x.title === a.title && Math.abs(x.t - a.t) < 120; })) return;
+        D.alerts.push(a);
+        toast(a);
+        if (S.ptab === 'alerts') renderPanel(); else { unread++; document.title = '(' + unread + ') QDSS Desk'; renderPanel(); }
+      } catch (err) {}
+    };
+  }
+
+  // ── the web copy: the data arrives scrambled and is unlocked with the key in the link ──
+  function b64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); var bin = atob(s + '==='.slice((s.length + 3) % 4)), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function keyText() {
+    var m = /[#&]k=([A-Za-z0-9_-]+)/.exec(location.hash), k = m ? m[1] : null;
+    try { if (k) localStorage.setItem('qdss-key', k); else k = localStorage.getItem('qdss-key'); } catch (e) {}
+    return k;
+  }
+  function loadRemote() {
+    var k = keyText();
+    if (!k) return Promise.reject(new Error('nokey'));
+    return fetch(REMOTE.url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('fetch'); return r.arrayBuffer(); }).then(function (buf) {
+      var u = new Uint8Array(buf);
+      return crypto.subtle.importKey('raw', b64u(k), 'AES-GCM', false, ['decrypt']).then(function (key) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: u.slice(0, 12) }, key, u.slice(12)); });
+    }).then(function (plain) { return new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text(); }).then(JSON.parse);
+  }
+  function gate(head, text) { $('gate').hidden = !head; if (head) { $('gatehead').textContent = head; $('gatetext').textContent = text; } }
+  function refreshRemote() {
+    loadRemote().then(function (d) {
+      if (D && d.made === D.made) { paintStatus(); return; }
+      var extra = D ? D.alerts.filter(function (a) { return !d.alerts.some(function (x) { return x.title === a.title && Math.abs(x.t - a.t) < 120; }); }) : [];
+      d.alerts = d.alerts.concat(extra).sort(function (a, b) { return a.t - b.t; });
+      D = d; norm(); renderAll(); startFeed();
+    }).catch(function () { paintStatus(); });
+  }
+
+  function start() {
+    renderAll(); startFeed(); pollPrices();
+    setInterval(pollPrices, 12000);
+    setInterval(paintStatus, 30000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { pollPrices(); if (REMOTE) refreshRemote(); } });
+    window.addEventListener('resize', function () { document.documentElement.style.setProperty('--topH', $('top').offsetHeight + 'px'); });
+    if (window.ResizeObserver) new ResizeObserver(function () { var el = $('lw'); if (lw && el.clientWidth > 0 && el.clientHeight > 0) { try { lw.chart.resize(el.clientWidth, el.clientHeight); } catch (e) {} } }).observe($('lw'));
+    if (REMOTE) setInterval(refreshRemote, 150000);
+    else if (LOCAL) setTimeout(function () { location.reload(); }, 5 * 60 * 1000);
+  }
+  if (D) start();
+  else if (REMOTE) {
+    gate('Opening your desk', 'Loading the latest data.');
+    loadRemote().then(function (d) { D = d; norm(); gate(null); start(); }).catch(function (err) {
+      gate(err && err.message === 'nokey' ? 'This link is missing its key' : 'Could not open the desk', err && err.message === 'nokey' ? 'Open the full link you were given. It ends with a long code after the # sign.' : 'The data could not be loaded or unlocked. Check the connection, or that the link is complete, then reload.');
+    });
+  }
+})();
+</script>
+
+</body></html>
